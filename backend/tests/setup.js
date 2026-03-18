@@ -1,0 +1,19 @@
+// Load test environment variables before any module imports
+process.env.NODE_ENV = 'test';
+process.env.DB_HOST = 'localhost';
+process.env.DB_PORT = '3307';
+process.env.DB_USER = 'root';
+process.env.DB_PASSWORD = 'root1234';
+process.env.DB_NAME = 'product_catalog_dev';
+process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.JWT_ACCESS_SECRET = 'test_access_secret_minimum_32_chars_long_for_tests';
+process.env.JWT_REFRESH_SECRET = 'test_refresh_secret_minimum_32_chars_long_for_tests';
+process.env.JWT_ACCESS_EXPIRY = '15m';
+process.env.JWT_REFRESH_EXPIRY = '7d';
+process.env.ENCRYPTION_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
+process.env.FRONTEND_URL = 'http://localhost:3000';
+process.env.ALLOWED_ORIGINS = 'http://localhost:3000';
+process.env.RAZORPAY_KEY_ID = 'rzp_test_key';
+process.env.RAZORPAY_KEY_SECRET = 'rzp_test_secret';
+process.env.RAZORPAY_WEBHOOK_SECRET = 'webhook_secret';
+process.env.PAYMENT_GATEWAY = 'mock';

@@ -76,4 +76,17 @@ const refundPayment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { verifyPayment, razorpayWebhook, getPaymentStatus, refundPayment, mockConfirm };
+// POST /api/v1/payments/mock/refund — simulate refund via mock gateway (dev/test only)
+// Body: { payment_id } — internal Payment table ID
+const mockRefund = async (req, res, next) => {
+  try {
+    const { payment_id, amount } = req.body;
+    if (!payment_id) {
+      throw new AppError('payment_id is required.', 400, 'VALIDATION_ERROR');
+    }
+    const result = await paymentService.processRefund(payment_id, amount);
+    return success(res, result, 'Mock refund processed');
+  } catch (err) { next(err); }
+};
+
+module.exports = { verifyPayment, razorpayWebhook, getPaymentStatus, refundPayment, mockConfirm, mockRefund };

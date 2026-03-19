@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   ArrowLeft, Loader2, AlertCircle, Plus, Trash2,
-  Upload, X, ImageIcon, Save,
+  Upload, X, ImageIcon, Save, ShoppingBag, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import adminProductsApi from '../../../api/admin/products.api';
 import adminCategoriesApi from '../../../api/admin/categories.api';
 import adminAttributesApi from '../../../api/admin/attributes.api';
+import adminOrdersApi from '../../../api/admin/orders.api';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Skeleton } from '../../../components/ui/skeleton';
-import { formatCurrency, slugify } from '../../../lib/formatters';
+import { formatCurrency, slugify, formatDateTime } from '../../../lib/formatters';
 
 // ─── Variant Edit Row ──────────────────────────────────────────────────────────
 
@@ -250,6 +251,151 @@ const NewVariantPanel = ({ productId, attributes, onSaved }) => {
         </Button>
         <Button size="sm" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
       </div>
+    </div>
+  );
+};
+
+// ─── ProductOrderHistory ───────────────────────────────────────────────────────
+
+const ORDER_STATUS_STYLES = {
+  pending:    'bg-yellow-50 text-yellow-700 border-yellow-200',
+  paid:       'bg-blue-50 text-blue-700 border-blue-200',
+  processing: 'bg-purple-50 text-purple-700 border-purple-200',
+  shipped:    'bg-indigo-50 text-indigo-700 border-indigo-200',
+  delivered:  'bg-green-50 text-green-700 border-green-200',
+  cancelled:  'bg-gray-50 text-gray-500 border-gray-200',
+};
+
+const ProductOrderHistory = ({ productId }) => {
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['admin', 'product-orders', productId, page],
+    queryFn: () => adminOrdersApi.getProductOrders(productId, { page, limit: 10 }).then((r) => r.data.data),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const orders = data?.orders ?? [];
+  const pagination = data?.pagination ?? {};
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6 mb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <ShoppingBag size={16} className="text-primary" />
+        <h2 className="font-semibold text-gray-900">Order History</h2>
+        {pagination.total !== undefined && (
+          <span className="text-xs text-muted-foreground ml-1">({pagination.total} order{pagination.total !== 1 ? 's' : ''})</span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+        </div>
+      ) : isError ? (
+        <p className="flex items-center gap-2 text-sm text-red-600">
+          <AlertCircle size={13} /> Failed to load order history.
+        </p>
+      ) : orders.length === 0 ? (
+        <div className="py-8 text-center border border-dashed border-gray-200 rounded-lg">
+          <ShoppingBag size={24} className="mx-auto mb-2 opacity-30 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">This product has not been ordered yet.</p>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Order #</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600 hidden sm:table-cell">Date</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600 hidden md:table-cell">Customer</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Qty</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Line Total</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.map((order) => {
+                  const totalQty = order.items?.reduce((s, i) => s + i.quantity, 0) ?? 0;
+                  const lineTotal = order.items?.reduce((s, i) => s + Number(i.line_total), 0) ?? 0;
+                  return (
+                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2">
+                        <span className="font-mono font-medium text-gray-900 text-xs">{order.order_number}</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 text-xs hidden sm:table-cell">
+                        {formatDateTime(order.created_at)}
+                      </td>
+                      <td className="px-3 py-2 hidden md:table-cell">
+                        {order.user ? (
+                          <div>
+                            <p className="text-gray-800 font-medium text-xs">
+                              {order.user.first_name} {order.user.last_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{order.user.email}</p>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-gray-700 text-xs">{totalQty}</td>
+                      <td className="px-3 py-2 font-medium text-gray-900 text-xs">{formatCurrency(lineTotal)}</td>
+                      <td className="px-3 py-2">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                          ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => navigate(`/admin/orders/${order.order_number}`)}
+                        >
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {pagination.total_pages > 1 && (
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <p className="text-muted-foreground">Page {pagination.page} of {pagination.total_pages}</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  <ChevronLeft size={12} /> Prev
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => setPage((p) => Math.min(pagination.total_pages, p + 1))}
+                  disabled={page >= pagination.total_pages}
+                >
+                  Next <ChevronRight size={12} />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
@@ -528,7 +674,7 @@ const ProductEditPage = () => {
       </div>
 
       {/* Variants */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6 mb-8">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900">Variants</h2>
         </div>
@@ -549,6 +695,9 @@ const ProductEditPage = () => {
           <NewVariantPanel productId={id} attributes={attributes} onSaved={invalidate} />
         </div>
       </div>
+
+      {/* Order History */}
+      <ProductOrderHistory productId={id} />
     </div>
   );
 };

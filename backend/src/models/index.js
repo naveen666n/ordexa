@@ -116,6 +116,9 @@ OrderItem.belongsTo(ProductVariant, { foreignKey: 'variant_id', as: 'variant' })
 Order.hasMany(OrderStatusHistory, { foreignKey: 'order_id', as: 'statusHistory', onDelete: 'CASCADE' });
 OrderStatusHistory.belongsTo(Order, { foreignKey: 'order_id', as: 'order' });
 
+OrderStatusHistory.belongsTo(User, { foreignKey: 'changed_by', as: 'changedByUser' });
+User.hasMany(OrderStatusHistory, { foreignKey: 'changed_by', as: 'statusChanges' });
+
 // ─── Payment Associations ─────────────────────────────────────────────────────
 
 Order.hasOne(Payment, { foreignKey: 'order_id', as: 'payment', onDelete: 'CASCADE' });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Package, MapPin, Clock, AlertCircle, Loader2, CreditCard, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Clock, AlertCircle, Loader2, CreditCard, RotateCcw, Check } from 'lucide-react';
 import ordersApi from '../../api/orders.api';
 import useAuthStore from '../../store/auth.store';
 import usePayment from '../../hooks/usePayment';
@@ -37,29 +37,144 @@ const PAYMENT_STATUS_LABELS = {
   failed: 'Payment Failed', refunded: 'Refunded', partially_refunded: 'Partially Refunded',
 };
 
-const CANCELLABLE = ['pending', 'paid', 'processing'];
+// CANCELLABLE list is now driven by admin config (fetched via ConfigContext)
 
-// ─── Status Timeline ──────────────────────────────────────────────────────────
+// ─── Order Tracker ────────────────────────────────────────────────────────────
 
-const StatusTimeline = ({ history }) => {
-  if (!history?.length) return null;
-  return (
-    <div className="space-y-3">
-      {history.map((entry, i) => (
-        <div key={entry.id} className="flex gap-3 text-sm">
-          <div className="flex flex-col items-center">
-            <div className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${
-              i === history.length - 1 ? 'bg-primary' : 'bg-gray-300'
-            }`} />
-            {i < history.length - 1 && <div className="w-px flex-1 bg-gray-200 mt-1" />}
+const TRACK_STEPS = [
+  { key: 'pending',    label: 'Order Placed',  desc: 'Your order has been placed.' },
+  { key: 'paid',       label: 'Payment Confirmed', desc: 'Payment received.' },
+  { key: 'processing', label: 'Processing',    desc: 'We\'re preparing your order.' },
+  { key: 'shipped',    label: 'Shipped',        desc: 'Your order is on its way.' },
+  { key: 'delivered',  label: 'Delivered',      desc: 'Order delivered successfully.' },
+];
+
+const OrderTracker = ({ order }) => {
+  const history = order.statusHistory || [];
+  const status = order.status;
+  const isCancelled = status === 'cancelled';
+
+  if (isCancelled) {
+    const cancelEntry = [...history].reverse().find((h) => h.to_status === 'cancelled');
+    return (
+      <div className="md:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+          <Clock size={16} className="text-primary" /> Order Tracking
+        </h2>
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-sm font-bold">✕</span>
           </div>
-          <div className="pb-3">
-            <p className="font-medium text-gray-800">{ORDER_STATUS_LABELS[entry.to_status] || entry.to_status}</p>
-            {entry.note && <p className="text-muted-foreground text-xs">{entry.note}</p>}
-            <p className="text-muted-foreground text-xs mt-0.5">{formatDateTime(entry.created_at)}</p>
+          <div>
+            <p className="font-semibold text-red-700">Order Cancelled</p>
+            {cancelEntry?.note && <p className="text-xs text-red-600 mt-0.5">{cancelEntry.note}</p>}
+            {cancelEntry?.created_at && (
+              <p className="text-xs text-red-500 mt-0.5">{formatDateTime(cancelEntry.created_at)}</p>
+            )}
           </div>
         </div>
-      ))}
+      </div>
+    );
+  }
+
+  const currentStepIndex = TRACK_STEPS.findIndex((s) => s.key === status);
+
+  // Find timestamp for each status from history
+  const getTimestamp = (stepKey) => {
+    const entry = history.find((h) => h.to_status === stepKey);
+    return entry ? formatDateTime(entry.created_at) : null;
+  };
+
+  const getNote = (stepKey) => {
+    const entry = history.find((h) => h.to_status === stepKey);
+    return entry?.note || null;
+  };
+
+  return (
+    <div className="md:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+      <h2 className="font-semibold text-gray-900 flex items-center gap-2 mb-6">
+        <Clock size={16} className="text-primary" /> Order Tracking
+      </h2>
+
+      {/* Desktop stepper */}
+      <div className="hidden sm:flex items-start w-full mb-6">
+        {TRACK_STEPS.map((step, i) => {
+          const done = currentStepIndex > i;
+          const current = currentStepIndex === i;
+          return (
+            <div key={step.key} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center min-w-0">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${
+                  done    ? 'bg-green-500 border-green-500' :
+                  current ? 'bg-primary border-primary' :
+                            'bg-white border-gray-200'
+                }`}>
+                  {done ? (
+                    <Check size={14} className="text-white" strokeWidth={3} />
+                  ) : current ? (
+                    <div className="w-3 h-3 rounded-full bg-white" />
+                  ) : (
+                    <div className="w-3 h-3 rounded-full bg-gray-200" />
+                  )}
+                </div>
+                <p className={`mt-2 text-xs font-semibold text-center ${
+                  done ? 'text-green-600' : current ? 'text-primary' : 'text-gray-400'
+                }`}>{step.label}</p>
+                {getTimestamp(step.key) && (
+                  <p className="text-[10px] text-muted-foreground text-center mt-0.5">{getTimestamp(step.key)}</p>
+                )}
+              </div>
+              {i < TRACK_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-2 mt-[-20px] ${done ? 'bg-green-400' : 'bg-gray-200'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mobile: vertical steps */}
+      <div className="flex sm:hidden flex-col gap-0 mb-4">
+        {TRACK_STEPS.map((step, i) => {
+          const done = currentStepIndex > i;
+          const current = currentStepIndex === i;
+          return (
+            <div key={step.key} className="flex items-start gap-3">
+              <div className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 flex-shrink-0 ${
+                  done    ? 'bg-green-500 border-green-500' :
+                  current ? 'bg-primary border-primary' :
+                            'bg-white border-gray-200'
+                }`}>
+                  {done ? <Check size={13} className="text-white" strokeWidth={3} />
+                        : current ? <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                        : <div className="w-2.5 h-2.5 rounded-full bg-gray-200" />}
+                </div>
+                {i < TRACK_STEPS.length - 1 && (
+                  <div className={`w-0.5 h-6 ${done ? 'bg-green-400' : 'bg-gray-200'}`} />
+                )}
+              </div>
+              <div className="pt-1 pb-3">
+                <p className={`text-sm font-semibold ${
+                  done ? 'text-green-600' : current ? 'text-primary' : 'text-gray-400'
+                }`}>{step.label}</p>
+                {getTimestamp(step.key) && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{getTimestamp(step.key)}</p>
+                )}
+                {current && getNote(step.key) && (
+                  <p className="text-xs text-gray-500 mt-0.5 italic">{getNote(step.key)}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Shipping note (if shipped) */}
+      {getNote('shipped') && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 text-sm text-indigo-800">
+          <span className="font-medium">Tracking info: </span>{getNote('shipped')}
+        </div>
+      )}
     </div>
   );
 };
@@ -143,6 +258,7 @@ const OrderDetailPage = () => {
 
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  const [refundInfo, setRefundInfo] = useState(null);
 
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ['order', orderNumber],
@@ -173,9 +289,12 @@ const OrderDetailPage = () => {
   const handleCancel = async () => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     setCancelError('');
+    setRefundInfo(null);
     setCancelling(true);
     try {
-      await ordersApi.cancel(orderNumber);
+      const res = await ordersApi.cancel(orderNumber);
+      const refund = res.data?.data?.refund;
+      if (refund) setRefundInfo(refund);
       queryClient.invalidateQueries({ queryKey: ['order', orderNumber] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (err) {
@@ -185,7 +304,9 @@ const OrderDetailPage = () => {
     }
   };
 
-  const canCancel = CANCELLABLE.includes(order.status);
+  const config = useConfig();
+  const cancellableStatuses = config?.order?.cancellable_statuses ?? ['pending', 'paid', 'processing'];
+  const canCancel = cancellableStatuses.includes(order.status);
   const paymentStatus = order.payment?.status;
   const needsPayment = order.status === 'pending' && paymentStatus !== 'captured';
 
@@ -234,6 +355,22 @@ const OrderDetailPage = () => {
         </p>
       )}
 
+      {refundInfo && (
+        <div className={`flex items-start gap-3 rounded-xl px-4 py-4 mb-4 border ${
+          refundInfo.status === 'refunded'
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
+          {refundInfo.status === 'refunded' ? <Check size={16} className="flex-shrink-0 mt-0.5" /> : <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />}
+          <div>
+            {refundInfo.status === 'refunded' && refundInfo.amount && (
+              <p className="font-semibold text-sm">{formatCurrency(refundInfo.amount)} refund initiated</p>
+            )}
+            <p className="text-sm mt-0.5">{refundInfo.message}</p>
+          </div>
+        </div>
+      )}
+
       {/* Pending payment banner + retry */}
       {needsPayment && (
         <div className="mb-4">
@@ -242,6 +379,9 @@ const OrderDetailPage = () => {
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
+        {/* Order Tracker — always visible, full width */}
+        <OrderTracker order={order} />
+
         {/* Order Items */}
         <div className="md:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
@@ -322,17 +462,6 @@ const OrderDetailPage = () => {
               <p>{order.address_snapshot.city}, {order.address_snapshot.state} – {order.address_snapshot.postal_code}</p>
               <p>{order.address_snapshot.country}</p>
             </div>
-          </div>
-        )}
-
-        {/* Status Timeline */}
-        {order.statusHistory?.length > 0 && (
-          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
-              <Clock size={16} className="text-primary" />
-              Order Timeline
-            </h2>
-            <StatusTimeline history={order.statusHistory} />
           </div>
         )}
 

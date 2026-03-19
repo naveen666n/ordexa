@@ -6,6 +6,7 @@ const requireRole = require('../../../middleware/requireRole');
 const validation = require('./products.validation');
 const { uploadMiddleware } = require('../../storage/storage.service');
 const auditLog = require('../../../middleware/auditLog');
+const ordersController = require('../../orders/orders.controller');
 
 const validate = (schema) => (req, res, next) => {
   const { error, value } = schema.validate(req.body, { abortEarly: false });
@@ -29,6 +30,9 @@ router.delete('/:id', auditLog('PRODUCT_DELETE', 'product'), controller.destroy)
 // Images
 router.post('/:id/images', uploadMiddleware, controller.uploadImage);
 router.delete('/:id/images/:imgId', controller.deleteImage);
+
+// Order history for a product
+router.get('/:id/orders', ordersController.getProductOrders);
 
 // Variants
 router.post('/:id/variants', validate(validation.createVariant), controller.addVariant);

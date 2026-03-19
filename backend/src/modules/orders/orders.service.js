@@ -11,6 +11,7 @@ const shippingService = require('../shipping/shipping.service');
 const taxService = require('../tax/tax.service');
 const { generateOrderNumber } = require('../../utils/orderNumber');
 const { validateTransition, validateCancellable } = require('./status.validator');
+const { getCancellableStatuses } = require('../config/config.service');
 const { AppError } = require('../../utils/errors');
 const { Op } = require('sequelize');
 
@@ -213,7 +214,12 @@ const getOrderByNumber = async (orderNumber, userId = null) => {
     where,
     include: [
       { model: OrderItem, as: 'items' },
-      { model: OrderStatusHistory, as: 'statusHistory', order: [['created_at', 'ASC']] },
+      {
+        model: OrderStatusHistory,
+        as: 'statusHistory',
+        order: [['created_at', 'ASC']],
+        include: [{ model: User, as: 'changedByUser', attributes: ['id', 'first_name', 'last_name'] }],
+      },
       { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email'] },
       { model: Payment, as: 'payment' },
     ],
@@ -242,10 +248,14 @@ const listOrders = async (userId, { page = 1, limit = 10 } = {}) => {
 // ─── cancelOrder (customer) ───────────────────────────────────────────────────
 
 const cancelOrder = async (orderNumber, userId) => {
-  const order = await Order.findOne({ where: { order_number: orderNumber, user_id: userId } });
+  const order = await Order.findOne({
+    where: { order_number: orderNumber, user_id: userId },
+    include: [{ model: Payment, as: 'payment' }],
+  });
   if (!order) throw new AppError('Order not found.', 404, 'NOT_FOUND');
 
-  validateCancellable(order.status);
+  const cancellableStatuses = await getCancellableStatuses();
+  validateCancellable(order.status, cancellableStatuses);
 
   await sequelize.transaction(async (t) => {
     const prevStatus = order.status;
@@ -272,7 +282,29 @@ const cancelOrder = async (orderNumber, userId) => {
     }, { transaction: t });
   });
 
-  return getOrderByNumber(orderNumber, userId);
+  // Auto-refund if payment was captured (non-blocking — cancellation succeeds regardless)
+  let refund = null;
+  const payment = order.payment;
+  if (payment && payment.status === 'captured') {
+    try {
+      const refundResult = await paymentService.processRefund(payment.id, Number(payment.amount));
+      refund = {
+        status: 'refunded',
+        amount: Number(payment.amount),
+        gateway_refund_id: refundResult.refundResult?.id || null,
+        message: 'Refund initiated successfully. Amount will be credited within 5-7 business days.',
+      };
+    } catch (err) {
+      console.error('[cancelOrder] Auto-refund failed:', err.message);
+      refund = {
+        status: 'failed',
+        message: 'Cancellation successful but refund could not be initiated. Please contact support.',
+      };
+    }
+  }
+
+  const updatedOrder = await getOrderByNumber(orderNumber, userId);
+  return { order: updatedOrder, refund };
 };
 
 // ─── updateOrderStatus (operations) ──────────────────────────────────────────
@@ -347,6 +379,47 @@ const listAllOrders = async ({ page = 1, limit = 20, status, from, to } = {}) =>
   };
 };
 
+// ─── getProductOrders (admin) ─────────────────────────────────────────────────
+
+const getProductOrders = async (productId, { page = 1, limit = 20 } = {}) => {
+  const offset = (page - 1) * limit;
+
+  const variants = await ProductVariant.findAll({
+    where: { product_id: productId },
+    attributes: ['id'],
+  });
+  const variantIds = variants.map((v) => v.id);
+
+  if (!variantIds.length) {
+    return { orders: [], pagination: { total: 0, page, limit, total_pages: 0 } };
+  }
+
+  const { rows: orders, count: total } = await Order.findAndCountAll({
+    include: [
+      {
+        model: OrderItem,
+        as: 'items',
+        where: { variant_id: { [Op.in]: variantIds } },
+        required: true,
+      },
+      {
+        model: User,
+        as: 'user',
+        attributes: ['id', 'first_name', 'last_name', 'email'],
+      },
+    ],
+    order: [['created_at', 'DESC']],
+    limit,
+    offset,
+    distinct: true,
+  });
+
+  return {
+    orders,
+    pagination: { total, page, limit, total_pages: Math.ceil(total / limit) },
+  };
+};
+
 module.exports = {
   createOrder,
   getOrderByNumber,
@@ -354,4 +427,5 @@ module.exports = {
   cancelOrder,
   updateOrderStatus,
   listAllOrders,
+  getProductOrders,
 };

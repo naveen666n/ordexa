@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider } from '../context/ConfigContext';
 import ErrorBoundary from '../components/common/ErrorBoundary';
+import AuthInitializer from '../components/common/AuthInitializer';
 
 // Guards
 import AuthGuard from './guards/AuthGuard';
@@ -51,6 +52,7 @@ import ShippingConfigPage from '../pages/admin/config/ShippingConfigPage';
 import TaxConfigPage from '../pages/admin/config/TaxConfigPage';
 import NotificationConfigPage from '../pages/admin/config/NotificationConfigPage';
 import FeatureFlagsPage from '../pages/admin/config/FeatureFlagsPage';
+import OrdersConfigPage from '../pages/admin/config/OrdersConfigPage';
 import CmsHomePage from '../pages/admin/cms/CmsHomePage';
 import CmsContentPage from '../pages/admin/cms/CmsContentPage';
 import ReviewsModerationPage from '../pages/admin/ReviewsModerationPage';
@@ -81,6 +83,7 @@ const AppRouter = () => {
       <BrowserRouter>
         <ConfigProvider>
           <ErrorBoundary>
+            <AuthInitializer>
             <Routes>
 
               {/* ── Auth Routes ─────────────────────────────────────── */}
@@ -138,6 +141,7 @@ const AppRouter = () => {
                 <Route path="config/tax" element={<TaxConfigPage />} />
                 <Route path="config/notifications" element={<NotificationConfigPage />} />
                 <Route path="config/features" element={<FeatureFlagsPage />} />
+                <Route path="config/orders" element={<OrdersConfigPage />} />
                 <Route path="cms" element={<CmsHomePage />} />
                 <Route path="cms/content" element={<CmsContentPage />} />
                 <Route path="reviews" element={<ReviewsModerationPage />} />
@@ -163,6 +167,7 @@ const AppRouter = () => {
               <Route path="*" element={<NotFoundPage />} />
 
             </Routes>
+            </AuthInitializer>
           </ErrorBoundary>
         </ConfigProvider>
       </BrowserRouter>

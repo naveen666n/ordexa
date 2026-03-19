@@ -51,6 +51,11 @@ const StatusTimeline = ({ history }) => {
           </div>
           <div className="pb-3">
             <p className="font-medium text-gray-800">{ORDER_STATUS_LABELS[entry.to_status] || entry.to_status}</p>
+            {entry.changedByUser && (
+              <p className="text-muted-foreground text-xs">
+                by {entry.changedByUser.first_name} {entry.changedByUser.last_name}
+              </p>
+            )}
             {entry.note && <p className="text-muted-foreground text-xs">{entry.note}</p>}
             <p className="text-muted-foreground text-xs mt-0.5">{formatDateTime(entry.created_at)}</p>
           </div>

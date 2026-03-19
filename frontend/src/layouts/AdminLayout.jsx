@@ -8,8 +8,8 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
 
-  const handleLogout = async () => {
-    try { await authApi.logout(); } catch {}
+  const handleLogout = () => {
+    authApi.logout().catch(() => {});
     clearAuth();
     navigate('/login', { replace: true });
   };
@@ -42,6 +42,7 @@ const AdminLayout = () => {
         {navLink('/admin/discounts/coupons', 'Coupons')}
         {navLink('/admin/discounts/offers', 'Global Offers')}
         {navLink('/admin/config/general', 'Config')}
+        {navLink('/admin/config/orders', 'Order Settings')}
         {navLink('/admin/cms', 'CMS')}
       </aside>
 

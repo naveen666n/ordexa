@@ -3,6 +3,8 @@
 const SiteConfig = require('../../models/SiteConfig');
 const FeatureFlag = require('../../models/FeatureFlag');
 
+const DEFAULT_CANCELLABLE_STATUSES = ['pending', 'paid', 'processing'];
+
 /**
  * Infer value_type from a JS value
  */
@@ -93,8 +95,22 @@ const updateGroup = async (group, data) => {
 };
 
 /**
+ * Get the currently configured cancellable statuses for customer orders.
+ * Reads from SiteConfig group='orders', key='cancellable_statuses'.
+ * Falls back to the default list if not yet configured.
+ */
+const getCancellableStatuses = async () => {
+  const row = await SiteConfig.findOne({ where: { group: 'orders', key: 'cancellable_statuses' } });
+  if (row) {
+    const parsed = parseValue(row.value, row.value_type);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  }
+  return DEFAULT_CANCELLABLE_STATUSES;
+};
+
+/**
  * Return public config for ConfigContext:
- * { site, theme, features, contact }
+ * { site, theme, features, contact, order }
  */
 const getPublicConfig = async () => {
   const [siteRows, themeRows, flagRows] = await Promise.all([
@@ -123,7 +139,9 @@ const getPublicConfig = async () => {
     phone: site.contact_phone || '',
   };
 
-  return { site, theme, features, contact };
+  const cancellableStatuses = await getCancellableStatuses();
+
+  return { site, theme, features, contact, order: { cancellable_statuses: cancellableStatuses } };
 };
 
-module.exports = { getGroup, getGroupRaw, updateGroup, getPublicConfig };
+module.exports = { getGroup, getGroupRaw, updateGroup, getPublicConfig, getCancellableStatuses };

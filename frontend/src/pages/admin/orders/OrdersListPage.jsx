@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Search, ShoppingBag, AlertCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import adminOrdersApi from '../../../api/admin/orders.api';
 import { Button } from '../../../components/ui/button';
@@ -44,7 +44,7 @@ const OrdersListPage = () => {
     queryKey: ['admin', 'orders', params],
     queryFn: () => adminOrdersApi.list(params).then((r) => r.data.data),
     staleTime: 30_000,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const orders = data?.orders ?? [];

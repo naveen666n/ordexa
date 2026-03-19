@@ -12,10 +12,11 @@ BACKEND_DIR="$APP_DIR/backend"
 DB_NAME="product_catalog_prod"
 DB_USER="catalog_user"
 DB_PASSWORD="${DB_PASSWORD:-CHANGE_ME}"  # override from env
+CF_TOKEN="${CF_TOKEN:-}"                 # optional: Cloudflare API token for DNS-01 challenge
 
 echo "==> [1/8] Installing system dependencies"
 sudo apt-get update -y
-sudo apt-get install -y curl git unzip nginx certbot python3-certbot-nginx
+sudo apt-get install -y curl git unzip nginx certbot python3-certbot-nginx python3-certbot-dns-cloudflare
 
 echo "==> [2/8] Installing Node.js 20 LTS via nvm"
 if ! command -v nvm &>/dev/null; then
@@ -82,7 +83,7 @@ sudo systemctl reload nginx
 
 echo "==> [8/8] Obtaining SSL certificate (Let's Encrypt)"
 
-# Pre-flight: verify DNS before attempting cert issuance
+# Pre-flight: check A records and detect AAAA conflicts
 MY_IP=$(curl -4 -sf https://checkip.amazonaws.com || curl -4 -sf https://api.ipify.org || echo "unknown")
 DOMAIN_A=$(dig +short A "$DOMAIN" | tail -1)
 WWW_A=$(dig +short A "www.$DOMAIN" | tail -1)
@@ -91,37 +92,48 @@ WWW_AAAA=$(dig +short AAAA "www.$DOMAIN" | tail -1)
 echo "    This server's public IP  : $MY_IP"
 echo "    $DOMAIN A record        : ${DOMAIN_A:-<unresolved>}"
 echo "    www.$DOMAIN A record    : ${WWW_A:-<unresolved>}"
-echo "    $DOMAIN AAAA record     : ${DOMAIN_AAAA:-(none — good)}"
-echo "    www.$DOMAIN AAAA record : ${WWW_AAAA:-(none — good)}"
+echo "    $DOMAIN AAAA record     : ${DOMAIN_AAAA:-(none)}"
+echo "    www.$DOMAIN AAAA record : ${WWW_AAAA:-(none)}"
 
-DNS_OK=true
-if [[ -n "$DOMAIN_AAAA" || -n "$WWW_AAAA" ]]; then
-  echo ""
-  echo "  ERROR: AAAA (IPv6) records still exist!"
-  echo "  Let's Encrypt prefers IPv6 and will reach the wrong server."
-  echo "  Delete these from your DNS panel, then re-run:"
-  [[ -n "$DOMAIN_AAAA" ]]     && echo "    DELETE  AAAA  $DOMAIN      $DOMAIN_AAAA"
-  [[ -n "$WWW_AAAA" ]]        && echo "    DELETE  AAAA  www.$DOMAIN  $WWW_AAAA"
-  DNS_OK=false
-fi
+# Check A records point here
 if [[ "$DOMAIN_A" != "$MY_IP" || "$WWW_A" != "$MY_IP" ]]; then
   echo ""
   echo "  ERROR: A records do not point to this server ($MY_IP)."
-  echo "  Set in your DNS panel:"
   [[ "$DOMAIN_A" != "$MY_IP" ]]  && echo "    SET  A  $DOMAIN      $MY_IP  (currently: ${DOMAIN_A:-unresolved})"
   [[ "$WWW_A" != "$MY_IP" ]]     && echo "    SET  A  www.$DOMAIN  $MY_IP  (currently: ${WWW_A:-unresolved})"
-  echo "  Then wait for propagation: dig +short A $DOMAIN"
-  DNS_OK=false
-fi
-if [[ "$DNS_OK" != "true" ]]; then
-  echo ""
-  echo "  Aborting. Fix DNS issues above and re-run this script."
+  echo "  Aborting. Fix A records and re-run."
   exit 1
 fi
 
-sudo certbot certonly --webroot -w /var/www/certbot \
-  -d "$DOMAIN" -d "www.$DOMAIN" \
-  --non-interactive --agree-tos --email "admin@${DOMAIN}"
+# Warn about AAAA records but don't abort — use DNS-01 if CF_TOKEN is set
+if [[ -n "$DOMAIN_AAAA" || -n "$WWW_AAAA" ]]; then
+  echo ""
+  echo "  WARNING: AAAA (IPv6) records exist and may cause HTTP-01 to fail."
+  if [[ -z "$CF_TOKEN" ]]; then
+    echo "  Tip: set CF_TOKEN=<cloudflare-api-token> to use DNS-01 challenge instead."
+    echo "  See: https://dash.cloudflare.com/profile/api-tokens (use 'Edit zone DNS' template)"
+  fi
+fi
+
+if [[ -n "$CF_TOKEN" ]]; then
+  echo "    Using DNS-01 challenge via Cloudflare API (CF_TOKEN set)"
+  CF_CREDS_FILE="/root/.cloudflare.ini"
+  sudo bash -c "cat > $CF_CREDS_FILE <<EOF
+dns_cloudflare_api_token = ${CF_TOKEN}
+EOF"
+  sudo chmod 600 "$CF_CREDS_FILE"
+  sudo certbot certonly --dns-cloudflare \
+    --dns-cloudflare-credentials "$CF_CREDS_FILE" \
+    --dns-cloudflare-propagation-seconds 30 \
+    -d "$DOMAIN" -d "www.$DOMAIN" \
+    --non-interactive --agree-tos --email "admin@${DOMAIN}"
+  sudo rm -f "$CF_CREDS_FILE"
+else
+  echo "    Using HTTP-01 challenge via webroot"
+  sudo certbot certonly --webroot -w /var/www/certbot \
+    -d "$DOMAIN" -d "www.$DOMAIN" \
+    --non-interactive --agree-tos --email "admin@${DOMAIN}"
+fi
 
 # Now install the full SSL nginx config
 sudo cp "$(dirname "$0")/nginx.conf" "/etc/nginx/sites-available/product-catalog"

@@ -5,14 +5,21 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-DOMAIN="${DOMAIN:-YOUR_DOMAIN}"          # override: DOMAIN=store.example.com ./deploy.sh
+DOMAIN="${DOMAIN:-YOUR_DOMAIN}"                        # required
+DB_PASSWORD="${DB_PASSWORD:-CHANGE_ME}"               # required
+RAZORPAY_KEY_ID="${RAZORPAY_KEY_ID:-}"                # required
+RAZORPAY_KEY_SECRET="${RAZORPAY_KEY_SECRET:-}"        # required
+RAZORPAY_WEBHOOK_SECRET="${RAZORPAY_WEBHOOK_SECRET:-}" # required
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"              # optional
+GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"      # optional
+CF_TOKEN="${CF_TOKEN:-}"                              # optional: Cloudflare API token for DNS-01
+RUN_SEEDERS="${RUN_SEEDERS:-false}"                   # set true on first deploy
+
 APP_DIR="/var/www/product-catalog"
 UPLOAD_DIR="/var/uploads"
 BACKEND_DIR="$APP_DIR/backend"
 DB_NAME="product_catalog_prod"
 DB_USER="catalog_user"
-DB_PASSWORD="${DB_PASSWORD:-CHANGE_ME}"  # override from env
-CF_TOKEN="${CF_TOKEN:-}"                 # optional: Cloudflare API token for DNS-01 challenge
 
 echo "==> [1/8] Installing system dependencies"
 sudo apt-get update -y
@@ -142,8 +149,16 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 echo ""
-echo "✓  Server setup complete."
-echo "   Next steps:"
-echo "   1. Copy your project files to $BACKEND_DIR"
-echo "   2. Copy deploy/env.production.template → $BACKEND_DIR/.env and fill in values"
-echo "   3. Run: ./app-deploy.sh"
+echo "✓  Server infrastructure ready. Starting app deployment..."
+echo ""
+
+# Pass through all relevant env vars to app-deploy.sh
+DOMAIN="$DOMAIN" \
+DB_PASSWORD="$DB_PASSWORD" \
+RAZORPAY_KEY_ID="${RAZORPAY_KEY_ID:-rzp_live_XXXXXXXXXXXXXX}" \
+RAZORPAY_KEY_SECRET="${RAZORPAY_KEY_SECRET:-CHANGE_ME}" \
+RAZORPAY_WEBHOOK_SECRET="${RAZORPAY_WEBHOOK_SECRET:-CHANGE_ME}" \
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
+GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}" \
+RUN_SEEDERS="${RUN_SEEDERS:-false}" \
+bash "$(dirname "$0")/app-deploy.sh"

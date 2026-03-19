@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import productsApi from '../../api/products.api';
 import categoriesApi from '../../api/categories.api';
+import { cmsApi } from '../../api/cms.api';
 import ProductCard from '../../components/customer/ProductCard';
 import { Skeleton } from '../../components/ui/skeleton';
 import { useConfig } from '../../hooks/useConfig';
@@ -10,14 +11,18 @@ import { CACHE_TIME } from '../../lib/constants';
 
 // ─── Hero Banner ──────────────────────────────────────────────────────────────
 
-const HeroBanner = ({ config }) => {
-  const title = config?.cms?.homepage?.hero?.title || config?.site?.name || 'Shop the Latest';
-  const subtitle = config?.cms?.homepage?.hero?.subtitle || config?.site?.tagline || 'Discover thousands of products at unbeatable prices';
-  const ctaText = config?.cms?.homepage?.hero?.cta_text || 'Shop Now';
-  const ctaLink = config?.cms?.homepage?.hero?.cta_link || '/catalog';
+const HeroBanner = ({ cms, config }) => {
+  const title = cms?.hero_title || config?.site?.name || 'Shop the Latest';
+  const subtitle = cms?.hero_subtitle || config?.site?.tagline || 'Discover thousands of products at unbeatable prices';
+  const ctaText = cms?.hero_cta_text || 'Shop Now';
+  const ctaLink = cms?.hero_cta_link || '/catalog';
+  const imageUrl = cms?.hero_image_url || null;
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+      {imageUrl && (
+        <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+      )}
       <div className="absolute inset-0 opacity-10" style={{
         backgroundImage: 'radial-gradient(circle at 20% 50%, #6366f1 0%, transparent 50%), radial-gradient(circle at 80% 20%, #06b6d4 0%, transparent 40%)'
       }} />
@@ -106,12 +111,53 @@ const FeaturedProducts = ({ products, isLoading }) => (
   </section>
 );
 
+// ─── Promotional Banners ──────────────────────────────────────────────────────
+
+const PromoBanners = ({ cms }) => {
+  const banners = [
+    { image: cms?.banner1_image_url, link: cms?.banner1_link },
+    { image: cms?.banner2_image_url, link: cms?.banner2_link },
+  ].filter((b) => b.image);
+
+  if (banners.length === 0) return null;
+
+  return (
+    <section className="container mx-auto px-4 py-8">
+      <div className={`grid gap-4 ${banners.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+        {banners.map((banner, i) =>
+          banner.link ? (
+            <Link key={i} to={banner.link} className="block rounded-xl overflow-hidden group">
+              <img
+                src={banner.image}
+                alt={`Promotional banner ${i + 1}`}
+                className="w-full object-cover rounded-xl group-hover:scale-[1.02] transition-transform duration-300"
+              />
+            </Link>
+          ) : (
+            <div key={i} className="rounded-xl overflow-hidden">
+              <img
+                src={banner.image}
+                alt={`Promotional banner ${i + 1}`}
+                className="w-full object-cover rounded-xl"
+              />
+            </div>
+          )
+        )}
+      </div>
+    </section>
+  );
+};
+
 // ─── Promo strip ─────────────────────────────────────────────────────────────
 
-const PromoStrip = ({ config }) => {
-  const msg = config?.cms?.homepage?.promo_text || '🚚 Free shipping on orders above ₹999 · Use code WELCOME10 for 10% off your first order';
+const PromoStrip = ({ cms }) => {
+  const msg = cms?.promo_strip_text || '🚚 Free shipping on orders above ₹999 · Use code WELCOME10 for 10% off your first order';
+  const bgColor = cms?.promo_strip_color;
   return (
-    <div className="bg-primary text-primary-foreground text-center text-xs font-medium py-2 px-4">
+    <div
+      className="text-center text-xs font-medium py-2 px-4 text-white"
+      style={{ backgroundColor: bgColor || 'var(--color-primary, #4F46E5)' }}
+    >
       {msg}
     </div>
   );
@@ -121,6 +167,12 @@ const PromoStrip = ({ config }) => {
 
 const HomePage = () => {
   const config = useConfig();
+
+  const { data: cmsHome } = useQuery({
+    queryKey: ['cms', 'home'],
+    queryFn: () => cmsApi.getSection('home'),
+    staleTime: CACHE_TIME.CATALOG,
+  });
 
   const { data: categoryData, isLoading: catsLoading } = useQuery({
     queryKey: ['category-tree'],
@@ -139,9 +191,10 @@ const HomePage = () => {
 
   return (
     <div>
-      <PromoStrip config={config} />
-      <HeroBanner config={config} />
+      <PromoStrip cms={cmsHome} />
+      <HeroBanner cms={cmsHome} config={config} />
       <FeaturedCategories categories={topCategories} isLoading={catsLoading} />
+      <PromoBanners cms={cmsHome} />
       <FeaturedProducts products={featuredProducts} isLoading={prodsLoading} />
     </div>
   );

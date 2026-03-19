@@ -69,6 +69,7 @@ const CmsHomePage = () => {
     try {
       await cmsApi.updateSection('home', payload);
       queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'home'] });
+      queryClient.invalidateQueries({ queryKey: ['cms', 'home'] });
       setStatuses((p) => ({ ...p, [sectionKey]: { type: 'success', message: 'Saved successfully.' } }));
     } catch (err) {
       setStatuses((p) => ({ ...p, [sectionKey]: { type: 'error', message: err.response?.data?.error?.message || 'Failed to save.' } }));

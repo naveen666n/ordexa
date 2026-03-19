@@ -56,10 +56,17 @@ sudo mkdir -p "$APP_DIR" "$UPLOAD_DIR"
 sudo chown -R "$USER:$USER" "$APP_DIR" "$UPLOAD_DIR"
 sudo chmod 755 "$UPLOAD_DIR"
 
-echo "==> [7/8] Nginx: installing site config"
-sudo cp "$(dirname "$0")/nginx.conf" "/etc/nginx/sites-available/product-catalog"
-# Replace placeholder domain
-sudo sed -i "s/YOUR_DOMAIN/${DOMAIN}/g" /etc/nginx/sites-available/product-catalog
+echo "==> [7/8] Nginx: installing temporary HTTP config for certbot"
+sudo tee /etc/nginx/sites-available/product-catalog > /dev/null <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN} www.${DOMAIN};
+    root /var/www/product-catalog;
+    index index.html;
+    location / { try_files \$uri \$uri/ /index.html; }
+}
+NGINX
 sudo ln -sf /etc/nginx/sites-available/product-catalog /etc/nginx/sites-enabled/product-catalog
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
@@ -67,6 +74,11 @@ sudo systemctl reload nginx
 
 echo "==> [8/8] Obtaining SSL certificate (Let's Encrypt)"
 sudo certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos --email "admin@${DOMAIN}" --redirect
+
+# Now install the full SSL nginx config
+sudo cp "$(dirname "$0")/nginx.conf" "/etc/nginx/sites-available/product-catalog"
+sudo sed -i "s/YOUR_DOMAIN/${DOMAIN}/g" /etc/nginx/sites-available/product-catalog
+sudo nginx -t
 sudo systemctl reload nginx
 
 echo ""

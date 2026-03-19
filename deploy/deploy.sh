@@ -57,14 +57,22 @@ sudo chown -R "$USER:$USER" "$APP_DIR" "$UPLOAD_DIR"
 sudo chmod 755 "$UPLOAD_DIR"
 
 echo "==> [7/8] Nginx: installing temporary HTTP config for certbot"
+# Webroot dir for ACME challenges
+sudo mkdir -p /var/www/certbot
 sudo tee /etc/nginx/sites-available/product-catalog > /dev/null <<NGINX
 server {
     listen 80;
-    listen [::]:80;
     server_name ${DOMAIN} www.${DOMAIN};
-    root /var/www/product-catalog;
-    index index.html;
-    location / { try_files \$uri \$uri/ /index.html; }
+
+    # ACME challenge (certbot webroot)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        root /var/www/product-catalog;
+        try_files \$uri \$uri/ /index.html;
+    }
 }
 NGINX
 sudo ln -sf /etc/nginx/sites-available/product-catalog /etc/nginx/sites-enabled/product-catalog
@@ -73,7 +81,28 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 echo "==> [8/8] Obtaining SSL certificate (Let's Encrypt)"
-sudo certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos --email "admin@${DOMAIN}" --redirect
+
+# Pre-flight: warn if domain DNS doesn't resolve to this server's public IP
+MY_IP=$(curl -4 -sf https://checkip.amazonaws.com || curl -4 -sf https://api.ipify.org || echo "unknown")
+DOMAIN_IP=$(getent hosts "$DOMAIN" | awk '{print $1; exit}')
+WWW_IP=$(getent hosts "www.$DOMAIN" | awk '{print $1; exit}')
+echo "    This server's public IP : $MY_IP"
+echo "    $DOMAIN resolves to    : ${DOMAIN_IP:-<unresolved>}"
+echo "    www.$DOMAIN resolves to: ${WWW_IP:-<unresolved>}"
+if [[ "$DOMAIN_IP" != "$MY_IP" || "$WWW_IP" != "$MY_IP" ]]; then
+  echo ""
+  echo "  WARNING: DNS mismatch detected!"
+  echo "  Set the A records for $DOMAIN and www.$DOMAIN to $MY_IP"
+  echo "  Also remove any AAAA (IPv6) records — Let's Encrypt may reach the wrong server via IPv6."
+  echo "  Re-run this script after DNS propagates (use: dig +short $DOMAIN)"
+  echo ""
+  read -rp "  Continue anyway? (y/N): " CONFIRM
+  [[ "${CONFIRM,,}" == "y" ]] || exit 1
+fi
+
+sudo certbot certonly --webroot -w /var/www/certbot \
+  -d "$DOMAIN" -d "www.$DOMAIN" \
+  --non-interactive --agree-tos --email "admin@${DOMAIN}"
 
 # Now install the full SSL nginx config
 sudo cp "$(dirname "$0")/nginx.conf" "/etc/nginx/sites-available/product-catalog"

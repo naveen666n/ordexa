@@ -5,9 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import useDebounce from '../../hooks/useDebounce';
 import productsApi from '../../api/products.api';
 import { formatCurrency } from '../../lib/formatters';
-import { API_BASE_URL } from '../../lib/constants';
-
-const BACKEND_URL = API_BASE_URL.replace('/api/v1', '');
+import { getImageSrc } from '../../lib/utils';
 
 const PLACEHOLDER_IMG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"%3E%3Crect width="48" height="48" fill="%23f3f4f6"/%3E%3C/svg%3E';
 
@@ -88,7 +86,7 @@ const SearchBar = () => {
                   className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left transition-colors"
                 >
                   <img
-                    src={p.primary_image_url ? `${BACKEND_URL}${p.primary_image_url}` : PLACEHOLDER_IMG}
+                    src={getImageSrc(p.primary_image_url) || PLACEHOLDER_IMG}
                     alt={p.name}
                     className="h-10 w-10 rounded object-cover flex-shrink-0 bg-gray-100"
                     onError={(e) => { e.target.src = PLACEHOLDER_IMG; }}

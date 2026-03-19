@@ -50,8 +50,8 @@ const getBySlug = async (slug) => {
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 const createCategory = async (data) => {
-  // Auto-generate slug if not provided
-  const rawSlug = data.slug || slugify(data.name);
+  // Slugify: always run through slugify so user-provided values with spaces/caps are normalised
+  const rawSlug = slugify(data.slug || data.name);
 
   // Ensure slug is unique — append counter if needed
   let slug = rawSlug;
@@ -83,9 +83,9 @@ const updateCategory = async (id, data) => {
     throw err;
   }
 
-  // Handle slug update
-  if (data.slug || data.name) {
-    const rawSlug = data.slug || slugify(data.name || existing.name);
+  // Handle slug update — always slugify so user-entered values are normalised
+  if (data.slug !== undefined || data.name) {
+    const rawSlug = slugify(data.slug || data.name || existing.name);
     let slug = rawSlug;
     let counter = 1;
     while (await repo.slugExists(slug, id)) {

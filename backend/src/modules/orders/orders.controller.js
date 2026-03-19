@@ -30,8 +30,8 @@ const getOrder = async (req, res, next) => {
 
 const cancelOrder = async (req, res, next) => {
   try {
-    const order = await ordersService.cancelOrder(req.params.orderNumber, req.user.id);
-    return success(res, { order }, 'Order cancelled');
+    const { order, refund } = await ordersService.cancelOrder(req.params.orderNumber, req.user.id);
+    return success(res, { order, refund }, 'Order cancelled');
   } catch (err) { next(err); }
 };
 
@@ -76,6 +76,15 @@ const updateOrderStatus = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getProductOrders = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const result = await ordersService.getProductOrders(req.params.id, { page, limit });
+    return success(res, result);
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   createOrder,
   listOrders,
@@ -84,4 +93,5 @@ module.exports = {
   listAllOrders,
   getOrderDetail,
   updateOrderStatus,
+  getProductOrders,
 };

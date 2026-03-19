@@ -98,7 +98,11 @@ const getProductBySlug = async (slug) => {
     throw err;
   }
   const data = product.toJSON();
-  data.variants = (data.variants || []).map(addStockStatus);
+  data.variants = (data.variants || []).map((v) => {
+    const variant = addStockStatus(v);
+    delete variant.cost_price;
+    return variant;
+  });
   return data;
 };
 
@@ -158,7 +162,7 @@ const getProductById = async (id) => {
 
 const createProduct = async (data) => {
   const sanitized = sanitizeProductData(data);
-  const rawSlug = sanitized.slug || slugify(sanitized.name);
+  const rawSlug = slugify(sanitized.slug || sanitized.name);
   const slug = await resolveUniqueSlug(rawSlug);
   const product = await repo.createProduct({ ...sanitized, slug });
   await invalidatePattern('products:listing:*');
@@ -174,7 +178,7 @@ const updateProduct = async (id, data) => {
   }
   data = sanitizeProductData(data);
   if (data.name || data.slug) {
-    const rawSlug = data.slug || slugify(data.name || existing.name);
+    const rawSlug = slugify(data.slug || data.name || existing.name);
     data.slug = await resolveUniqueSlug(rawSlug, id);
   }
   await repo.updateProduct(id, data);
@@ -195,15 +199,30 @@ const deleteProduct = async (id) => {
 
 // ─── Images ───────────────────────────────────────────────────────────────────
 
-const addImage = async (productId, file) => {
-  const existing = await repo.findById(productId);
-  if (!existing) {
+const addImages = async (productId, files) => {
+  const product = await repo.findById(productId);
+  if (!product) {
     const err = new Error('Product not found');
     err.code = 'NOT_FOUND';
     throw err;
   }
-  const url = storageService.uploadFile(file);
-  return repo.createImage(productId, url, file.originalname);
+  const images = [];
+  for (const file of files) {
+    const url = storageService.uploadFile(file);
+    const image = await repo.createImage(productId, url, file.originalname);
+    images.push(image);
+  }
+  return images;
+};
+
+const setPrimaryImage = async (productId, imageId) => {
+  const product = await repo.findById(productId);
+  if (!product) {
+    const err = new Error('Product not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  await repo.setPrimaryImage(productId, imageId);
 };
 
 const deleteImage = async (productId, imageId) => {
@@ -267,6 +286,6 @@ const deactivateVariant = async (productId, variantId) => {
 module.exports = {
   getProducts, searchProducts, getProductBySlug, getProductById, listAllForAdmin, getCategoryFilters,
   createProduct, updateProduct, deleteProduct,
-  addImage, deleteImage,
+  addImages, deleteImage, setPrimaryImage,
   createVariant, updateVariant, deactivateVariant,
 };

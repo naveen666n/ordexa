@@ -38,17 +38,30 @@ const getSection = async (section) => {
 
 /**
  * Upsert each key/value pair for a section.
+ * Arrays and objects are stored as JSON with value_type='json'.
  */
 const updateSection = async (section, data) => {
   for (const [key, val] of Object.entries(data)) {
     const existing = await CmsContent.findOne({ where: { section, key } });
     const sanitized = sanitizeCmsValue(key, val);
-    const serialized = (sanitized === null || sanitized === undefined) ? null : String(sanitized);
+
+    let serialized;
+    let valueType;
+    if (sanitized === null || sanitized === undefined) {
+      serialized = null;
+      valueType = 'string';
+    } else if (typeof sanitized === 'object') {
+      serialized = JSON.stringify(sanitized);
+      valueType = 'json';
+    } else {
+      serialized = String(sanitized);
+      valueType = 'string';
+    }
 
     if (existing) {
-      await existing.update({ value: serialized });
+      await existing.update({ value: serialized, value_type: valueType });
     } else {
-      await CmsContent.create({ section, key, value: serialized, value_type: 'string' });
+      await CmsContent.create({ section, key, value: serialized, value_type: valueType });
     }
   }
 };

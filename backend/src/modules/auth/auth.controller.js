@@ -5,7 +5,7 @@ const env = require('../../config/env');
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
   path: '/',
 };
@@ -114,6 +114,15 @@ const googleCallback = async (req, res, next) => {
   }
 };
 
+// GET /auth/me — returns the current user from Bearer token (no cookie needed)
+const getMe = async (req, res, next) => {
+  try {
+    return success(res, { user: authService.safeUser(req.user) });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /auth/complete-registration
 const completeRegistration = async (req, res, next) => {
   try {
@@ -132,5 +141,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   googleCallback,
+  getMe,
   completeRegistration,
 };

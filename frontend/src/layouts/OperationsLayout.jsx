@@ -8,8 +8,8 @@ const OperationsLayout = () => {
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
 
-  const handleLogout = async () => {
-    try { await authApi.logout(); } catch {}
+  const handleLogout = () => {
+    authApi.logout().catch(() => {});
     clearAuth();
     navigate('/login', { replace: true });
   };

@@ -66,7 +66,12 @@ app.use('/api/v1/auth', authLimiter);
 app.use('/api/v1/admin', adminLimiter);
 
 // ─── Static files (uploads) ───────────────────────────────────────────────────
-app.use('/uploads', express.static('uploads'));
+// Set Cross-Origin-Resource-Policy to cross-origin so the frontend (different
+// port) can load uploaded images. Helmet defaults to same-origin which blocks them.
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static('uploads'));
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -89,6 +94,7 @@ const paymentRoutes = require('./modules/payments/payments.routes');
 const adminPaymentRoutes = require('./modules/payments/admin.payments.routes');
 const configRoutes = require('./modules/config/config.routes');
 const cmsRoutes = require('./modules/cms/cms.routes');
+const mediaRoutes = require('./modules/media/media.routes');
 const shippingAdminRoutes = require('./modules/shipping/shipping.routes');
 const taxAdminRoutes = require('./modules/tax/tax.routes');
 const userAdminRoutes = require('./modules/users/users.routes');
@@ -111,6 +117,7 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/admin/payments', adminPaymentRoutes);
 app.use('/api/v1', configRoutes);
 app.use('/api/v1', cmsRoutes);
+app.use('/api/v1', mediaRoutes);
 app.use('/api/v1/admin/shipping', shippingAdminRoutes);
 app.use('/api/v1/admin/tax', taxAdminRoutes);
 app.use('/api/v1/admin/users', userAdminRoutes);

@@ -1,5 +1,6 @@
 node_modules/
 .env
+configs/googleOAuthCredentials.json
 dist/
 uploads/*
 !uploads/.gitkeep

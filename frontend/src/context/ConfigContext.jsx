@@ -36,6 +36,9 @@ const defaultConfig = {
     phone: '',
   },
   social: {},
+  order: {
+    cancellable_statuses: ['pending', 'paid', 'processing'],
+  },
 };
 
 export const ConfigProvider = ({ children }) => {

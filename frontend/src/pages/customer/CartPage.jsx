@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShoppingCart, Tag, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { ShoppingCart, Tag, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import cartApi from '../../api/cart.api';
 import useCartStore from '../../store/cart.store';
 import useAuthStore from '../../store/auth.store';
@@ -13,18 +13,28 @@ import { cn } from '../../lib/utils';
 
 // ─── Coupon Section ───────────────────────────────────────────────────────────
 
-const CouponSection = ({ appliedCoupon, onApply, onRemove }) => {
+const formatCouponLabel = (c) => {
+  if (c.offer_type === 'PERCENT') return `${c.discount_value}% off`;
+  if (c.offer_type === 'FIXED') return `₹${c.discount_value} off`;
+  if (c.offer_type === 'FREE_SHIPPING') return 'Free shipping';
+  return '';
+};
+
+const CouponSection = ({ appliedCoupon, onApply, onRemove, availableCoupons = [] }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showCoupons, setShowCoupons] = useState(false);
 
-  const handleApply = async () => {
-    if (!code.trim()) return;
+  const handleApply = async (applyCode) => {
+    const c = (applyCode || code).trim().toUpperCase();
+    if (!c) return;
     setError('');
     setLoading(true);
     try {
-      await onApply(code.trim().toUpperCase());
+      await onApply(c);
       setCode('');
+      setShowCoupons(false);
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Invalid coupon code.');
     } finally {
@@ -55,7 +65,7 @@ const CouponSection = ({ appliedCoupon, onApply, onRemove }) => {
           placeholder="Enter coupon code"
           className="flex-1 h-10 px-4 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
-        <Button onClick={handleApply} disabled={loading || !code.trim()}>
+        <Button onClick={() => handleApply()} disabled={loading || !code.trim()}>
           {loading ? <Loader2 size={16} className="animate-spin" /> : 'Apply'}
         </Button>
       </div>
@@ -63,6 +73,45 @@ const CouponSection = ({ appliedCoupon, onApply, onRemove }) => {
         <p className="flex items-center gap-1.5 text-sm text-red-500">
           <AlertCircle size={13} /> {error}
         </p>
+      )}
+
+      {/* Available coupons */}
+      {availableCoupons.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowCoupons((v) => !v)}
+            className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+          >
+            {showCoupons ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            {showCoupons ? 'Hide available coupons' : `View ${availableCoupons.length} available coupon${availableCoupons.length !== 1 ? 's' : ''}`}
+          </button>
+
+          {showCoupons && (
+            <div className="mt-2 space-y-2">
+              {availableCoupons.map((c) => (
+                <div key={c.code} className="flex items-center justify-between bg-gray-50 border border-dashed border-gray-200 rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Tag size={12} className="text-primary flex-shrink-0" />
+                      <span className="text-sm font-mono font-semibold text-gray-800">{c.code}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatCouponLabel(c)}
+                      {c.min_order_value > 0 ? ` · Min. ₹${c.min_order_value}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleApply(c.code)}
+                    disabled={loading}
+                    className="text-xs font-medium text-primary hover:underline flex-shrink-0 ml-2"
+                  >
+                    Apply
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -150,6 +199,13 @@ const CartPage = () => {
     queryFn: () => cartApi.getSummary().then((r) => r.data.data.summary),
     enabled: isAuthenticated && (cartData?.items?.length > 0),
     staleTime: 0,
+  });
+
+  const { data: couponsData } = useQuery({
+    queryKey: ['available-coupons'],
+    queryFn: () => cartApi.getAvailableCoupons().then((r) => r.data.data.coupons),
+    enabled: isAuthenticated,
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -262,6 +318,7 @@ const CartPage = () => {
               appliedCoupon={cart.applied_coupon}
               onApply={handleApplyCoupon}
               onRemove={handleRemoveCoupon}
+              availableCoupons={couponsData || []}
             />
           </div>
         </div>

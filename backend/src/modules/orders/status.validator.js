@@ -12,8 +12,8 @@ const TRANSITIONS = {
   cancelled: [],
 };
 
-// Statuses from which customers/operations can cancel
-const CANCELLABLE_FROM = ['pending', 'paid', 'processing'];
+// Default statuses from which customers can cancel (used as fallback)
+const DEFAULT_CANCELLABLE_FROM = ['pending', 'paid', 'processing'];
 
 const validateTransition = (fromStatus, toStatus) => {
   const allowed = TRANSITIONS[fromStatus] || [];
@@ -26,8 +26,8 @@ const validateTransition = (fromStatus, toStatus) => {
   }
 };
 
-const validateCancellable = (status) => {
-  if (!CANCELLABLE_FROM.includes(status)) {
+const validateCancellable = (status, cancellableStatuses = DEFAULT_CANCELLABLE_FROM) => {
+  if (!cancellableStatuses.includes(status)) {
     throw new AppError(
       `Order cannot be cancelled from status '${status}'.`,
       400,
@@ -36,4 +36,4 @@ const validateCancellable = (status) => {
   }
 };
 
-module.exports = { validateTransition, validateCancellable, CANCELLABLE_FROM };
+module.exports = { validateTransition, validateCancellable, DEFAULT_CANCELLABLE_FROM };

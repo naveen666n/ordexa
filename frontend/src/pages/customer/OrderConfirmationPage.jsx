@@ -6,6 +6,7 @@ import ordersApi from '../../api/orders.api';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { formatCurrency, formatDateTime } from '../../lib/formatters';
+import { getImageSrc } from '../../lib/utils';
 
 const PAYMENT_STATUS_LABELS = {
   initiated: 'Awaiting Payment',
@@ -85,7 +86,7 @@ const OrderConfirmationPage = () => {
             <div key={item.id} className="flex items-center gap-3 text-sm">
               {item.image_url && (
                 <img
-                  src={item.image_url}
+                  src={getImageSrc(item.image_url)}
                   alt={item.product_name}
                   className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border"
                 />

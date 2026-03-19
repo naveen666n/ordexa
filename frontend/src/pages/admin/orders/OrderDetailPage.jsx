@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { formatCurrency, formatDateTime } from '../../../lib/formatters';
+import { getImageSrc } from '../../../lib/utils';
 
 const ORDER_STATUS_STYLES = {
   pending:    'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -51,6 +52,11 @@ const StatusTimeline = ({ history }) => {
           </div>
           <div className="pb-3">
             <p className="font-medium text-gray-800">{ORDER_STATUS_LABELS[entry.to_status] || entry.to_status}</p>
+            {entry.changedByUser && (
+              <p className="text-muted-foreground text-xs">
+                by {entry.changedByUser.first_name} {entry.changedByUser.last_name}
+              </p>
+            )}
             {entry.note && <p className="text-muted-foreground text-xs">{entry.note}</p>}
             <p className="text-muted-foreground text-xs mt-0.5">{formatDateTime(entry.created_at)}</p>
           </div>
@@ -257,7 +263,7 @@ const AdminOrderDetailPage = () => {
               <div key={item.id} className="flex items-center gap-4 text-sm">
                 {item.image_url && (
                   <img
-                    src={item.image_url}
+                    src={getImageSrc(item.image_url)}
                     alt={item.product_name}
                     className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border"
                   />

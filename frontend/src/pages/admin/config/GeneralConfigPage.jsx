@@ -5,6 +5,7 @@ import configApi from '../../../api/admin/config.api';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
+import ImageUploadField from '../../../components/admin/ImageUploadField';
 
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP'];
 
@@ -20,7 +21,7 @@ const GeneralConfigPage = () => {
     favicon_url: '',
   });
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState(null); // { type: 'success'|'error', message }
+  const [status, setStatus] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'config', 'site'],
@@ -29,12 +30,11 @@ const GeneralConfigPage = () => {
   });
 
   useEffect(() => {
-    if (data) {
-      setForm((prev) => ({ ...prev, ...data }));
-    }
+    if (data) setForm((prev) => ({ ...prev, ...data }));
   }, [data]);
 
   const handleChange = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  const setField = (key) => (val) => setForm((prev) => ({ ...prev, [key]: val }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -111,16 +111,21 @@ const GeneralConfigPage = () => {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="logo_url">Logo URL</Label>
-          <Input id="logo_url" value={form.logo_url} onChange={handleChange('logo_url')} placeholder="https://example.com/logo.png" />
-          <p className="text-xs text-muted-foreground">Enter a URL to your logo image. Image upload coming soon.</p>
-        </div>
+        <ImageUploadField
+          label="Logo"
+          value={form.logo_url}
+          onChange={setField('logo_url')}
+          placeholder="https://example.com/logo.png"
+          hint="Shown in the storefront header. Recommended: transparent PNG, min 200×60px."
+        />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="favicon_url">Favicon URL</Label>
-          <Input id="favicon_url" value={form.favicon_url} onChange={handleChange('favicon_url')} placeholder="https://example.com/favicon.ico" />
-        </div>
+        <ImageUploadField
+          label="Favicon"
+          value={form.favicon_url}
+          onChange={setField('favicon_url')}
+          placeholder="https://example.com/favicon.ico"
+          hint="Browser tab icon. Recommended: square ICO or PNG, 32×32px."
+        />
 
         <div className="pt-2">
           <Button onClick={handleSave} disabled={saving} className="gap-2">

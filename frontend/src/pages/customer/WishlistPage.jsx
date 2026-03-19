@@ -8,18 +8,15 @@ import useUIStore from '../../store/ui.store';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { formatCurrency } from '../../lib/formatters';
-import { API_BASE_URL } from '../../lib/constants';
+import { getImageSrc } from '../../lib/utils';
 
-const BACKEND_URL = API_BASE_URL.replace('/api/v1', '');
 const PLACEHOLDER_IMG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"%3E%3Crect width="120" height="120" fill="%23f3f4f6"/%3E%3C/svg%3E';
 
 // ─── WishlistItem ─────────────────────────────────────────────────────────────
 
 const WishlistItem = ({ item, onRemove, onAddToCart }) => {
   const { variant, product } = item;
-  const imgUrl = product?.images?.[0]?.url
-    ? `${BACKEND_URL}${product.images[0].url}`
-    : PLACEHOLDER_IMG;
+  const imgUrl = getImageSrc(product?.images?.[0]?.url) || PLACEHOLDER_IMG;
 
   return (
     <div className="flex gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm">

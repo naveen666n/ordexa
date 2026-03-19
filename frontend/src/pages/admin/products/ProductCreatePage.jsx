@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Loader2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, Plus, Trash2, Upload, X, ImageIcon } from 'lucide-react';
 import adminProductsApi from '../../../api/admin/products.api';
 import adminCategoriesApi from '../../../api/admin/categories.api';
 import adminAttributesApi from '../../../api/admin/attributes.api';
@@ -12,7 +12,7 @@ import { slugify } from '../../../lib/formatters';
 
 // ─── Variant Form Row ──────────────────────────────────────────────────────────
 
-const emptyVariant = () => ({ sku: '', name: '', price: '', compare_price: '', stock_quantity: '0', attribute_value_ids: [] });
+const emptyVariant = () => ({ sku: '', name: '', price: '', compare_price: '', cost_price: '', stock_quantity: '0', attribute_value_ids: [] });
 
 const VariantRow = ({ variant, index, attributes, onChange, onRemove }) => {
   const handleChange = (field, val) => onChange(index, { ...variant, [field]: val });
@@ -48,6 +48,10 @@ const VariantRow = ({ variant, index, attributes, onChange, onRemove }) => {
         <div>
           <Label className="text-xs">Compare price (₹)</Label>
           <Input type="number" min="0" step="0.01" value={variant.compare_price} onChange={(e) => handleChange('compare_price', e.target.value)} placeholder="0.00" className="mt-1 h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs">Cost price (₹) <span className="text-muted-foreground">(internal)</span></Label>
+          <Input type="number" min="0" step="0.01" value={variant.cost_price} onChange={(e) => handleChange('cost_price', e.target.value)} placeholder="0.00" className="mt-1 h-8 text-sm" />
         </div>
         <div>
           <Label className="text-xs">Stock qty</Label>
@@ -90,9 +94,11 @@ const ProductCreatePage = () => {
     category_ids: [],
   });
   const [variants, setVariants] = useState([emptyVariant()]);
+  const [imageFiles, setImageFiles] = useState([]); // File objects to upload after creation
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
+  const fileInputRef = useRef(null);
 
   const { data: categoriesData } = useQuery({
     queryKey: ['admin', 'categories'],
@@ -158,7 +164,7 @@ const ProductCreatePage = () => {
     try {
       const body = {
         ...form,
-        slug: form.slug || slugify(form.name),
+        slug: slugify(form.slug || form.name),
         meta_title: form.meta_title || undefined,
         meta_description: form.meta_description || undefined,
         brand: form.brand || undefined,
@@ -173,9 +179,15 @@ const ProductCreatePage = () => {
           name: v.name || undefined,
           price: Number(v.price),
           compare_price: v.compare_price ? Number(v.compare_price) : undefined,
+          cost_price: v.cost_price ? Number(v.cost_price) : undefined,
           stock_quantity: Number(v.stock_quantity) || 0,
           attribute_value_ids: v.attribute_value_ids,
         });
+      }
+
+      // Upload any images selected before creation
+      if (imageFiles.length > 0) {
+        await adminProductsApi.uploadImage(productId, imageFiles);
       }
 
       navigate(`/admin/products/${productId}/edit`);
@@ -295,6 +307,61 @@ const ProductCreatePage = () => {
               <p key={k} className="text-xs text-red-600">{msg}</p>
             ))}
           </div>
+        </div>
+
+        {/* Images */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold text-gray-900">Images</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Select images now — they will be uploaded when you create the product. Max 5 MB each.</p>
+            </div>
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+              <Upload size={12} /> Add Images
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setImageFiles((prev) => [...prev, ...files]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+          {imageFiles.length === 0 ? (
+            <div className="py-6 text-center text-muted-foreground border border-dashed border-gray-200 rounded-lg">
+              <ImageIcon size={20} className="mx-auto mb-1.5 opacity-30" />
+              <p className="text-xs">No images selected yet.</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {imageFiles.map((file, i) => (
+                <div key={i} className="relative group rounded-lg border border-gray-200 overflow-hidden">
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="w-24 h-24 object-cover"
+                  />
+                  {i === 0 && (
+                    <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      Default
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setImageFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* SEO */}

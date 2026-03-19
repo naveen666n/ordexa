@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, User, MapPin, Package, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import ordersApi from '../../api/operations/orders.api';
 import { formatCurrency, formatDateTime } from '../../lib/formatters';
+import { getImageSrc } from '../../lib/utils';
 import OrderStatusStepper from '../../components/operations/OrderStatusStepper';
 
 const STATUS_STYLES = {
@@ -216,15 +217,15 @@ const OrderProcessingPage = () => {
                   {/* Thumbnail */}
                   {item.image_url && (
                     <img
-                      src={item.image_url}
+                      src={getImageSrc(item.image_url)}
                       alt={item.product_name}
                       className="w-14 h-14 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                     />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{item.product_name}</p>
-                    {item.variant_info && (
-                      <p className="text-xs text-gray-500 mt-0.5">{item.variant_info}</p>
+                    {item.variant_info?.name && (
+                      <p className="text-xs text-gray-500 mt-0.5">{item.variant_info.name}</p>
                     )}
                     {item.sku && (
                       <p className="text-xs text-gray-400">SKU: {item.sku}</p>
@@ -380,12 +381,14 @@ const OrderProcessingPage = () => {
                     <div className="pb-4 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[entry.status] ?? STATUS_STYLES.pending}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_STYLES[entry.to_status ?? entry.status] ?? STATUS_STYLES.pending}`}
                         >
-                          {STATUS_LABELS[entry.status] ?? entry.status}
+                          {STATUS_LABELS[entry.to_status ?? entry.status] ?? (entry.to_status ?? entry.status)}
                         </span>
-                        {entry.changed_by && (
-                          <span className="text-xs text-gray-400">by {entry.changed_by}</span>
+                        {entry.changedByUser && (
+                          <span className="text-xs text-gray-400">
+                            by {entry.changedByUser.first_name} {entry.changedByUser.last_name}
+                          </span>
                         )}
                       </div>
                       <p className="text-xs text-gray-400 mt-1">{formatDateTime(entry.created_at ?? entry.timestamp)}</p>

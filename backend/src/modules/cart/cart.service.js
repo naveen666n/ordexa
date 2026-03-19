@@ -222,6 +222,25 @@ const getCartSummary = async (userId, region = null) => {
   };
 };
 
+// ─── Get Available Coupons (for customers to browse) ─────────────────────────
+
+const getAvailableCoupons = async () => {
+  const { DiscountCode } = require('../../models');
+  const { Op } = require('sequelize');
+  const now = new Date();
+  return DiscountCode.findAll({
+    where: {
+      is_active: true,
+      [Op.and]: [
+        { [Op.or]: [{ starts_at: null }, { starts_at: { [Op.lte]: now } }] },
+        { [Op.or]: [{ ends_at: null }, { ends_at: { [Op.gte]: now } }] },
+      ],
+    },
+    attributes: ['code', 'offer_type', 'discount_value', 'min_order_value', 'ends_at'],
+    order: [['created_at', 'DESC']],
+  });
+};
+
 // Export couponStore so order service can clear it after order creation
 const clearCouponStore = (userId) => couponStore.delete(userId);
 const getCouponForUser = (userId) => couponStore.get(userId) || null;
@@ -235,6 +254,7 @@ module.exports = {
   applyCoupon,
   removeCoupon,
   getCartSummary,
+  getAvailableCoupons,
   clearCouponStore,
   getCouponForUser,
 };

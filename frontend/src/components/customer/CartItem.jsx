@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { Trash2, Tag } from 'lucide-react';
+import { Trash2, Tag, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
-import { API_BASE_URL } from '../../lib/constants';
-
-const BACKEND_URL = API_BASE_URL.replace('/api/v1', '');
+import { getImageSrc } from '../../lib/utils';
 
 const PLACEHOLDER_IMG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"%3E%3Crect width="80" height="80" fill="%23f3f4f6"/%3E%3C/svg%3E';
 
@@ -19,6 +17,7 @@ const PLACEHOLDER_IMG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000
  */
 const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
   const [updating, setUpdating] = useState(false);
+  const [qtyError, setQtyError] = useState('');
 
   const {
     variant_id,
@@ -34,7 +33,7 @@ const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
     offer_discount,
   } = item;
 
-  const imgSrc = image_url ? `${BACKEND_URL}${image_url}` : PLACEHOLDER_IMG;
+  const imgSrc = getImageSrc(image_url) || PLACEHOLDER_IMG;
   const maxQty = stock_quantity || 99;
   const hasOffer = offer && offer_discount > 0;
 
@@ -42,8 +41,11 @@ const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
     const newQty = Math.max(1, Math.min(maxQty, quantity + delta));
     if (newQty === quantity) return;
     setUpdating(true);
+    setQtyError('');
     try {
       await onUpdate(variant_id, newQty);
+    } catch (err) {
+      setQtyError(err?.response?.data?.error?.message || 'Could not update quantity.');
     } finally {
       setUpdating(false);
     }
@@ -59,7 +61,7 @@ const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
   };
 
   return (
-    <div className={cn('flex gap-3', updating && 'opacity-60 pointer-events-none')}>
+    <div className={cn('flex gap-3', updating && 'opacity-60')}>
       {/* Image */}
       <img
         src={imgSrc}
@@ -107,7 +109,7 @@ const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
           <div className="flex items-center border border-gray-200 rounded-md overflow-hidden">
             <button
               onClick={() => handleQtyChange(-1)}
-              disabled={quantity <= 1}
+              disabled={quantity <= 1 || updating}
               className="px-2 py-1 text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-40"
             >
               −
@@ -117,7 +119,7 @@ const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
             </span>
             <button
               onClick={() => handleQtyChange(1)}
-              disabled={quantity >= maxQty}
+              disabled={quantity >= maxQty || updating}
               className="px-2 py-1 text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-40"
             >
               +
@@ -135,6 +137,11 @@ const CartItem = ({ item, onUpdate, onRemove, compact = false }) => {
             )}
           </div>
         </div>
+        {qtyError && (
+          <p className="flex items-center gap-1 text-xs text-red-500 mt-1">
+            <AlertCircle size={11} /> {qtyError}
+          </p>
+        )}
       </div>
     </div>
   );

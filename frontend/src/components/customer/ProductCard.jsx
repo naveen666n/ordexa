@@ -5,9 +5,8 @@ import { formatCurrency } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 import useAuthStore from '../../store/auth.store';
 import wishlistApi from '../../api/wishlist.api';
-import { API_BASE_URL } from '../../lib/constants';
+import { getImageSrc } from '../../lib/utils';
 
-const BACKEND_URL = API_BASE_URL.replace('/api/v1', '');
 const PLACEHOLDER_IMG = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="%239ca3af"%3ENo Image%3C/text%3E%3C/svg%3E';
 
 const OfferBadge = ({ minPrice, comparePrice }) => {
@@ -87,7 +86,7 @@ const ProductCard = ({ product }) => {
       {/* Image */}
       <div className="relative aspect-square overflow-hidden bg-gray-50">
         <img
-          src={primary_image_url ? `${BACKEND_URL}${primary_image_url}` : PLACEHOLDER_IMG}
+          src={getImageSrc(primary_image_url) || PLACEHOLDER_IMG}
           alt={primary_image_alt || name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           onError={(e) => { e.target.src = PLACEHOLDER_IMG; }}

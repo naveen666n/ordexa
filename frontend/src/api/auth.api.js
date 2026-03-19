@@ -5,6 +5,7 @@ const authApi = {
   login: (data) => apiClient.post('/auth/login', data),
   logout: () => apiClient.post('/auth/logout'),
   refreshToken: () => apiClient.post('/auth/refresh-token'),
+  me: () => apiClient.get('/auth/me'),
   forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password }),
   completeRegistration: (data) => apiClient.post('/auth/complete-registration', data),

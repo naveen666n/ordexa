@@ -57,6 +57,13 @@ const removeCoupon = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getAvailableCoupons = async (req, res, next) => {
+  try {
+    const coupons = await cartService.getAvailableCoupons();
+    return success(res, { coupons });
+  } catch (err) { next(err); }
+};
+
 const getCartSummary = async (req, res, next) => {
   try {
     const region = req.body.region || null;
@@ -65,4 +72,4 @@ const getCartSummary = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getCart, addItem, updateItem, removeItem, clearCart, applyCoupon, removeCoupon, getCartSummary };
+module.exports = { getCart, addItem, updateItem, removeItem, clearCart, applyCoupon, removeCoupon, getCartSummary, getAvailableCoupons };

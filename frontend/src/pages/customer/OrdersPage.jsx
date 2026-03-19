@@ -6,6 +6,7 @@ import ordersApi from '../../api/orders.api';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { formatCurrency, formatDate } from '../../lib/formatters';
+import { getImageSrc } from '../../lib/utils';
 
 const STATUS_STYLES = {
   pending:    'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -41,9 +42,29 @@ const OrderCard = ({ order }) => (
           {order.items?.slice(0, 3).map((item) => (
             <div key={item.id} className="flex items-center gap-1.5 text-xs text-gray-600">
               {item.image_url && (
-                <img src={item.image_url} alt={item.product_name} className="w-8 h-8 rounded-lg object-cover border" />
+                item.product_slug ? (
+                  <Link
+                    to={`/products/${item.product_slug}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-shrink-0"
+                  >
+                    <img src={getImageSrc(item.image_url)} alt={item.product_name} className="w-8 h-8 rounded-lg object-cover border hover:opacity-80 transition-opacity" />
+                  </Link>
+                ) : (
+                  <img src={getImageSrc(item.image_url)} alt={item.product_name} className="w-8 h-8 rounded-lg object-cover border" />
+                )
               )}
-              <span className="truncate max-w-[120px]">{item.product_name}</span>
+              {item.product_slug ? (
+                <Link
+                  to={`/products/${item.product_slug}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="truncate max-w-[120px] hover:text-primary hover:underline"
+                >
+                  {item.product_name}
+                </Link>
+              ) : (
+                <span className="truncate max-w-[120px]">{item.product_name}</span>
+              )}
               <span className="text-muted-foreground">×{item.quantity}</span>
             </div>
           ))}

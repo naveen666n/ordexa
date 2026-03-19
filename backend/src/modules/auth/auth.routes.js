@@ -2,13 +2,12 @@ const express = require('express');
 const router = express.Router();
 const passport = require('../../config/passport');
 const controller = require('./auth.controller');
-const { authLimiter } = require('../../middleware/rateLimiter');
 const authenticate = require('../../middleware/authenticate');
 const validation = require('./auth.validation');
 const env = require('../../config/env');
 
-// Apply auth rate limiter to all auth routes
-router.use(authLimiter);
+// NOTE: authLimiter is already applied at the app level in app.js for /api/v1/auth
+// Do not apply it again here to avoid double rate-limiting.
 
 // ─── Validate helper ──────────────────────────────────────────────────────────
 const validate = (schema) => (req, res, next) => {
@@ -29,9 +28,18 @@ router.post('/refresh-token', controller.refreshToken);
 router.post('/forgot-password', validate(validation.forgotPassword), controller.forgotPassword);
 router.post('/reset-password', validate(validation.resetPassword), controller.resetPassword);
 
+// Get current user from Bearer token (used by OAuth success page — no cookie needed)
+router.get('/me', authenticate, controller.getMe);
+
 // Google OAuth
 router.get(
   '/google',
+  (req, res, next) => {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      return res.redirect(`${env.FRONTEND_URL}/login?error=google_not_configured`);
+    }
+    next();
+  },
   passport.authenticate('google', { scope: ['profile', 'email'], session: false })
 );
 router.get(

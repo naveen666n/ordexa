@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   ArrowLeft, Loader2, AlertCircle, Plus, Trash2,
-  Upload, X, ImageIcon, Save,
+  Upload, X, ImageIcon, Save, ShoppingBag, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import adminProductsApi from '../../../api/admin/products.api';
 import adminCategoriesApi from '../../../api/admin/categories.api';
 import adminAttributesApi from '../../../api/admin/attributes.api';
+import adminOrdersApi from '../../../api/admin/orders.api';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Skeleton } from '../../../components/ui/skeleton';
-import { formatCurrency, slugify } from '../../../lib/formatters';
+import { formatCurrency, slugify, formatDateTime } from '../../../lib/formatters';
+import { getImageSrc } from '../../../lib/utils';
 
 // ─── Variant Edit Row ──────────────────────────────────────────────────────────
 
@@ -23,6 +25,7 @@ const VariantEditRow = ({ variant, productId, attributes, onSaved, onDeactivate 
     name: variant.name || '',
     price: String(variant.price),
     compare_price: variant.compare_price ? String(variant.compare_price) : '',
+    cost_price: variant.cost_price ? String(variant.cost_price) : '',
     stock_quantity: String(variant.stock_quantity ?? 0),
     attribute_value_ids: (variant.attributeValues || []).map((av) => av.id),
   });
@@ -38,6 +41,7 @@ const VariantEditRow = ({ variant, productId, attributes, onSaved, onDeactivate 
         name: form.name || undefined,
         price: Number(form.price),
         compare_price: form.compare_price ? Number(form.compare_price) : null,
+        cost_price: form.cost_price ? Number(form.cost_price) : null,
         stock_quantity: Number(form.stock_quantity) || 0,
         attribute_value_ids: form.attribute_value_ids,
       });
@@ -123,6 +127,10 @@ const VariantEditRow = ({ variant, productId, attributes, onSaved, onDeactivate 
               <Input type="number" min="0" step="0.01" value={form.compare_price} onChange={(e) => setForm((p) => ({ ...p, compare_price: e.target.value }))} className="mt-1 h-8 text-sm" />
             </div>
             <div>
+              <Label className="text-xs">Cost price (₹) <span className="text-muted-foreground">(internal)</span></Label>
+              <Input type="number" min="0" step="0.01" value={form.cost_price} onChange={(e) => setForm((p) => ({ ...p, cost_price: e.target.value }))} className="mt-1 h-8 text-sm" />
+            </div>
+            <div>
               <Label className="text-xs">Stock qty</Label>
               <Input type="number" min="0" value={form.stock_quantity} onChange={(e) => setForm((p) => ({ ...p, stock_quantity: e.target.value }))} className="mt-1 h-8 text-sm" />
             </div>
@@ -159,7 +167,7 @@ const VariantEditRow = ({ variant, productId, attributes, onSaved, onDeactivate 
 
 const NewVariantPanel = ({ productId, attributes, onSaved }) => {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ sku: '', name: '', price: '', compare_price: '', stock_quantity: '0', attribute_value_ids: [] });
+  const [form, setForm] = useState({ sku: '', name: '', price: '', compare_price: '', cost_price: '', stock_quantity: '0', attribute_value_ids: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -182,10 +190,11 @@ const NewVariantPanel = ({ productId, attributes, onSaved }) => {
         name: form.name || undefined,
         price: Number(form.price),
         compare_price: form.compare_price ? Number(form.compare_price) : undefined,
+        cost_price: form.cost_price ? Number(form.cost_price) : undefined,
         stock_quantity: Number(form.stock_quantity) || 0,
         attribute_value_ids: form.attribute_value_ids,
       });
-      setForm({ sku: '', name: '', price: '', compare_price: '', stock_quantity: '0', attribute_value_ids: [] });
+      setForm({ sku: '', name: '', price: '', compare_price: '', cost_price: '', stock_quantity: '0', attribute_value_ids: [] });
       setOpen(false);
       onSaved();
     } catch (err) {
@@ -224,6 +233,10 @@ const NewVariantPanel = ({ productId, attributes, onSaved }) => {
           <Input type="number" min="0" step="0.01" value={form.compare_price} onChange={(e) => setForm((p) => ({ ...p, compare_price: e.target.value }))} className="mt-1 h-8 text-sm" />
         </div>
         <div>
+          <Label className="text-xs">Cost price (₹) <span className="text-muted-foreground">(internal)</span></Label>
+          <Input type="number" min="0" step="0.01" value={form.cost_price} onChange={(e) => setForm((p) => ({ ...p, cost_price: e.target.value }))} className="mt-1 h-8 text-sm" />
+        </div>
+        <div>
           <Label className="text-xs">Stock qty</Label>
           <Input type="number" min="0" value={form.stock_quantity} onChange={(e) => setForm((p) => ({ ...p, stock_quantity: e.target.value }))} className="mt-1 h-8 text-sm" />
         </div>
@@ -250,6 +263,151 @@ const NewVariantPanel = ({ productId, attributes, onSaved }) => {
         </Button>
         <Button size="sm" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
       </div>
+    </div>
+  );
+};
+
+// ─── ProductOrderHistory ───────────────────────────────────────────────────────
+
+const ORDER_STATUS_STYLES = {
+  pending:    'bg-yellow-50 text-yellow-700 border-yellow-200',
+  paid:       'bg-blue-50 text-blue-700 border-blue-200',
+  processing: 'bg-purple-50 text-purple-700 border-purple-200',
+  shipped:    'bg-indigo-50 text-indigo-700 border-indigo-200',
+  delivered:  'bg-green-50 text-green-700 border-green-200',
+  cancelled:  'bg-gray-50 text-gray-500 border-gray-200',
+};
+
+const ProductOrderHistory = ({ productId }) => {
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['admin', 'product-orders', productId, page],
+    queryFn: () => adminOrdersApi.getProductOrders(productId, { page, limit: 10 }).then((r) => r.data.data),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const orders = data?.orders ?? [];
+  const pagination = data?.pagination ?? {};
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6 mb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <ShoppingBag size={16} className="text-primary" />
+        <h2 className="font-semibold text-gray-900">Order History</h2>
+        {pagination.total !== undefined && (
+          <span className="text-xs text-muted-foreground ml-1">({pagination.total} order{pagination.total !== 1 ? 's' : ''})</span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+        </div>
+      ) : isError ? (
+        <p className="flex items-center gap-2 text-sm text-red-600">
+          <AlertCircle size={13} /> Failed to load order history.
+        </p>
+      ) : orders.length === 0 ? (
+        <div className="py-8 text-center border border-dashed border-gray-200 rounded-lg">
+          <ShoppingBag size={24} className="mx-auto mb-2 opacity-30 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">This product has not been ordered yet.</p>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Order #</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600 hidden sm:table-cell">Date</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600 hidden md:table-cell">Customer</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Qty</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Line Total</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.map((order) => {
+                  const totalQty = order.items?.reduce((s, i) => s + i.quantity, 0) ?? 0;
+                  const lineTotal = order.items?.reduce((s, i) => s + Number(i.line_total), 0) ?? 0;
+                  return (
+                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2">
+                        <span className="font-mono font-medium text-gray-900 text-xs">{order.order_number}</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 text-xs hidden sm:table-cell">
+                        {formatDateTime(order.created_at)}
+                      </td>
+                      <td className="px-3 py-2 hidden md:table-cell">
+                        {order.user ? (
+                          <div>
+                            <p className="text-gray-800 font-medium text-xs">
+                              {order.user.first_name} {order.user.last_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{order.user.email}</p>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-gray-700 text-xs">{totalQty}</td>
+                      <td className="px-3 py-2 font-medium text-gray-900 text-xs">{formatCurrency(lineTotal)}</td>
+                      <td className="px-3 py-2">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                          ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          onClick={() => navigate(`/admin/orders/${order.order_number}`)}
+                        >
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {pagination.total_pages > 1 && (
+            <div className="flex items-center justify-between mt-3 text-xs">
+              <p className="text-muted-foreground">Page {pagination.page} of {pagination.total_pages}</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  <ChevronLeft size={12} /> Prev
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => setPage((p) => Math.min(pagination.total_pages, p + 1))}
+                  disabled={page >= pagination.total_pages}
+                >
+                  Next <ChevronRight size={12} />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
@@ -324,6 +482,7 @@ const ProductEditPage = () => {
     try {
       await adminProductsApi.update(id, {
         ...form,
+        slug: slugify(form.slug || form.name),
         brand: form.brand || undefined,
         meta_title: form.meta_title || undefined,
         meta_description: form.meta_description || undefined,
@@ -338,16 +497,16 @@ const ProductEditPage = () => {
   };
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setUploadingImage(true);
     setImageError('');
     try {
-      await adminProductsApi.uploadImage(id, file);
+      await adminProductsApi.uploadImage(id, files);
       queryClient.invalidateQueries({ queryKey: ['admin', 'product', id] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
     } catch (err) {
-      setImageError(err.response?.data?.error?.message || 'Failed to upload image.');
+      setImageError(err.response?.data?.error?.message || 'Failed to upload image(s).');
     } finally {
       setUploadingImage(false);
       e.target.value = '';
@@ -362,6 +521,16 @@ const ProductEditPage = () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
     } catch (err) {
       setImageError(err.response?.data?.error?.message || 'Failed to delete image.');
+    }
+  };
+
+  const handleSetPrimary = async (imgId) => {
+    try {
+      await adminProductsApi.setPrimaryImage(id, imgId);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'product', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
+    } catch (err) {
+      setImageError(err.response?.data?.error?.message || 'Failed to set default image.');
     }
   };
 
@@ -496,11 +665,14 @@ const ProductEditPage = () => {
       {/* Images */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Images</h2>
+          <div>
+            <h2 className="font-semibold text-gray-900">Images</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">First image is the default shown in listings. Upload multiple at once.</p>
+          </div>
           <label className={`flex items-center gap-1.5 text-sm cursor-pointer px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
             {uploadingImage ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-            {uploadingImage ? 'Uploading…' : 'Upload Image'}
-            <input type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} disabled={uploadingImage} />
+            {uploadingImage ? 'Uploading…' : 'Upload Images'}
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={handleImageUpload} disabled={uploadingImage} />
           </label>
         </div>
         {imageError && <p className="text-xs text-red-600 mb-3">{imageError}</p>}
@@ -511,24 +683,43 @@ const ProductEditPage = () => {
           </div>
         ) : (
           <div className="flex flex-wrap gap-3">
-            {product.images.map((img) => (
-              <div key={img.id} className="relative group">
-                <img src={img.url} alt={img.alt_text || product.name} className="w-24 h-24 object-cover rounded-lg border" />
-                <button
-                  type="button"
-                  onClick={() => handleDeleteImage(img.id)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
+            {[...(product.images || [])].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0)).map((img) => {
+              const src = getImageSrc(img.url);
+              return (
+                <div key={img.id} className={`relative group rounded-lg border-2 overflow-hidden ${img.is_primary ? 'border-primary' : 'border-gray-200'}`}>
+                  <img src={src} alt={img.alt_text || product.name} className="w-28 h-28 object-cover" />
+                  {img.is_primary && (
+                    <div className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      Default
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center gap-1 pb-2 opacity-0 group-hover:opacity-100">
+                    {!img.is_primary && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetPrimary(img.id)}
+                        className="text-[10px] bg-white text-gray-800 font-semibold px-2 py-1 rounded shadow hover:bg-gray-100"
+                      >
+                        Set Default
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteImage(img.id)}
+                      className="text-[10px] bg-red-500 text-white font-semibold px-2 py-1 rounded shadow hover:bg-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
       {/* Variants */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6 mb-8">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900">Variants</h2>
         </div>
@@ -549,6 +740,9 @@ const ProductEditPage = () => {
           <NewVariantPanel productId={id} attributes={attributes} onSaved={invalidate} />
         </div>
       </div>
+
+      {/* Order History */}
+      <ProductOrderHistory productId={id} />
     </div>
   );
 };

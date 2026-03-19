@@ -26,4 +26,7 @@ const mockGuard = (req, res, next) => {
 
 router.post('/mock/confirm', mockGuard, authenticate, controller.mockConfirm);
 
+// POST /api/v1/payments/mock/refund — simulate a refund on a mock gateway payment (dev / test only)
+router.post('/mock/refund', mockGuard, authenticate, controller.mockRefund);
+
 module.exports = router;

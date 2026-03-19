@@ -4,13 +4,17 @@ import useAuthStore from '../../../store/auth.store';
 import authApi from '../../../api/auth.api';
 
 /**
- * Backend redirects here: /auth/google/success?token=ACCESS_TOKEN&new_user=true|false
+ * Backend redirects here after Google OAuth:
+ *   /auth/google/success?token=ACCESS_TOKEN&new_user=true|false
  *
  * Flow:
- * 1. Read token + new_user from URL params
- * 2. Set a minimal auth state so Axios interceptor can attach the token
- * 3. Call /auth/refresh-token to get the full user object (refresh cookie is already set by backend)
- * 4. Redirect based on role / registration_completed
+ * 1. Read the access token from the URL query param
+ * 2. Set it in the auth store so Axios attaches it as Bearer on the next call
+ * 3. Call GET /auth/me (Bearer token — no cookie dependency) to get the full user object
+ * 4. Update auth store with the real user and navigate based on role / registration status
+ *
+ * Using /auth/me instead of /auth/refresh-token avoids the SameSite cookie issue
+ * that can occur in cross-port OAuth redirect flows on localhost.
  */
 const GoogleOAuthSuccessPage = () => {
   const [searchParams] = useSearchParams();
@@ -19,7 +23,6 @@ const GoogleOAuthSuccessPage = () => {
 
   useEffect(() => {
     const token = searchParams.get('token');
-    const isNewUser = searchParams.get('new_user') === 'true';
 
     if (!token) {
       navigate('/login?error=oauth_failed', { replace: true });
@@ -28,21 +31,15 @@ const GoogleOAuthSuccessPage = () => {
 
     const init = async () => {
       try {
-        // Decode JWT payload (no library needed — just base64)
-        const parts = token.split('.');
-        if (parts.length !== 3) throw new Error('bad token');
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        // Set a temporary auth state so Axios attaches the Bearer token on /auth/me
+        setAuth({ id: null, email: null, role: null }, token);
 
-        // Set a temporary auth state so Axios attaches the token on the refresh call
-        setAuth(
-          { id: payload.id, email: payload.email, role: payload.role, registration_completed: !isNewUser },
-          token
-        );
+        // Fetch the full user using the Bearer token — no cookie required
+        const res = await authApi.me();
+        const { user } = res.data.data;
 
-        // Fetch the full user via refresh-token endpoint (refresh cookie was set by backend redirect)
-        const res = await authApi.refreshToken();
-        const { user, accessToken } = res.data.data;
-        setAuth(user, accessToken);
+        // Update auth store with the real user (keep the same access token)
+        setAuth(user, token);
 
         if (!user.registration_completed) {
           navigate('/auth/complete', { replace: true });

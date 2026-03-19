@@ -43,6 +43,7 @@ const AdminLayout = () => {
         {navLink('/admin/discounts/offers', 'Global Offers')}
         {navLink('/admin/config/general', 'Config')}
         {navLink('/admin/config/orders', 'Order Settings')}
+        {navLink('/admin/config/storage', 'Storage')}
         {navLink('/admin/cms', 'CMS')}
       </aside>
 

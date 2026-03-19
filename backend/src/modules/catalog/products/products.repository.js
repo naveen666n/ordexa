@@ -230,7 +230,25 @@ const createImage = async (productId, url, altText) => {
   });
 };
 
-const destroyImage = (id) => ProductImage.destroy({ where: { id } });
+const destroyImage = async (id) => {
+  const image = await ProductImage.findByPk(id);
+  if (!image) return;
+  const wasPrimary = image.is_primary;
+  const productId = image.product_id;
+  await ProductImage.destroy({ where: { id } });
+  if (wasPrimary) {
+    const next = await ProductImage.findOne({
+      where: { product_id: productId },
+      order: [['sort_order', 'ASC'], ['id', 'ASC']],
+    });
+    if (next) await ProductImage.update({ is_primary: true }, { where: { id: next.id } });
+  }
+};
+
+const setPrimaryImage = async (productId, imageId) => {
+  await ProductImage.update({ is_primary: false }, { where: { product_id: productId } });
+  await ProductImage.update({ is_primary: true }, { where: { id: imageId, product_id: productId } });
+};
 
 // ─── Variants ─────────────────────────────────────────────────────────────────
 
@@ -290,6 +308,6 @@ const findAllForAdmin = ({ limit = 200, offset = 0 } = {}) =>
 module.exports = {
   findById, findBySlug, slugExists, createProduct, updateProduct, destroyProduct,
   findListing, findAllForAdmin, searchProducts, findFilterCounts,
-  findImageById, createImage, destroyImage,
+  findImageById, createImage, destroyImage, setPrimaryImage,
   findVariantById, skuExists, createVariant, updateVariant, deactivateVariant,
 };

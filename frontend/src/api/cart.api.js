@@ -10,5 +10,6 @@ const clear = () => client.delete('/cart');
 const applyCoupon = (code) => client.post('/cart/apply-coupon', { code });
 const removeCoupon = () => client.delete('/cart/remove-coupon');
 const getSummary = (region = null) => client.post('/cart/summary', { region });
+const getAvailableCoupons = () => client.get('/cart/available-coupons');
 
-export default { get, addItem, updateItem, removeItem, clear, applyCoupon, removeCoupon, getSummary };
+export default { get, addItem, updateItem, removeItem, clear, applyCoupon, removeCoupon, getSummary, getAvailableCoupons };

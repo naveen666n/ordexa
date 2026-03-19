@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import authApi from '../../../api/auth.api';
 import useAuthStore from '../../../store/auth.store';
@@ -9,15 +9,29 @@ import { Label } from '../../../components/ui/label';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { API_BASE_URL } from '../../../lib/constants';
 
+const OAUTH_ERROR_MESSAGES = {
+  google_failed: 'Google sign-in failed. Please try again.',
+  oauth_failed: 'Sign-in failed. Please try again.',
+  google_not_configured: 'Google sign-in is not available. Please use email and password.',
+};
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      setError(OAUTH_ERROR_MESSAGES[oauthError] || 'Sign-in failed. Please try again.');
+    }
+  }, []);
 
   const from = location.state?.from?.pathname || '/';
 

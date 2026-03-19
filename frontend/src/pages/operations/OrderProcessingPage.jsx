@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, User, MapPin, Package, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import ordersApi from '../../api/operations/orders.api';
 import { formatCurrency, formatDateTime } from '../../lib/formatters';
+import { getImageSrc } from '../../lib/utils';
 import OrderStatusStepper from '../../components/operations/OrderStatusStepper';
 
 const STATUS_STYLES = {
@@ -216,7 +217,7 @@ const OrderProcessingPage = () => {
                   {/* Thumbnail */}
                   {item.image_url && (
                     <img
-                      src={item.image_url}
+                      src={getImageSrc(item.image_url)}
                       alt={item.product_name}
                       className="w-14 h-14 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                     />

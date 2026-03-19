@@ -88,11 +88,22 @@ const destroy = async (req, res, next) => {
 };
 
 // POST /api/v1/admin/products/:id/images
-const uploadImage = async (req, res, next) => {
+const uploadImages = async (req, res, next) => {
   try {
-    if (!req.file) return businessError(res, 'No image file provided');
-    const image = await service.addImage(Number(req.params.id), req.file);
-    return created(res, { image }, 'Image uploaded');
+    if (!req.files || req.files.length === 0) return businessError(res, 'No image files provided');
+    const images = await service.addImages(Number(req.params.id), req.files);
+    return created(res, { images }, 'Images uploaded');
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') return notFound(res, err.message);
+    next(err);
+  }
+};
+
+// PUT /api/v1/admin/products/:id/images/:imgId/primary
+const setPrimaryImage = async (req, res, next) => {
+  try {
+    await service.setPrimaryImage(Number(req.params.id), Number(req.params.imgId));
+    return success(res, null, 'Default image updated');
   } catch (err) {
     if (err.code === 'NOT_FOUND') return notFound(res, err.message);
     next(err);
@@ -148,6 +159,6 @@ const deactivateVariant = async (req, res, next) => {
 module.exports = {
   getProducts, search, getBySlug,
   listAdmin, getById, create, update, destroy,
-  uploadImage, deleteImage,
+  uploadImages, deleteImage, setPrimaryImage,
   addVariant, updateVariant, deactivateVariant,
 };

@@ -72,4 +72,19 @@ const getFilters = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getTree, getBySlug, getAll, create, update, destroy, getFilters };
+// POST /api/v1/categories/admin/:id/image
+const uploadImage = async (req, res, next) => {
+  try {
+    if (!req.file) return businessError(res, 'No image file provided');
+    const { uploadFile } = require('../../storage/storage.service');
+    const url = uploadFile(req.file);
+    const id = Number(req.params.id);
+    const category = await service.updateCategory(id, { image_url: url });
+    return success(res, { image_url: url, category }, 'Category image uploaded');
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') return notFound(res, err.message);
+    next(err);
+  }
+};
+
+module.exports = { getTree, getBySlug, getAll, create, update, destroy, getFilters, uploadImage };

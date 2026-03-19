@@ -4,12 +4,12 @@ const controller = require('./products.controller');
 const authenticate = require('../../../middleware/authenticate');
 const requireRole = require('../../../middleware/requireRole');
 const validation = require('./products.validation');
-const { uploadMiddleware } = require('../../storage/storage.service');
+const { uploadMultipleMiddleware } = require('../../storage/storage.service');
 const auditLog = require('../../../middleware/auditLog');
 const ordersController = require('../../orders/orders.controller');
 
 const validate = (schema) => (req, res, next) => {
-  const { error, value } = schema.validate(req.body, { abortEarly: false });
+  const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
   if (error) {
     const { validationError } = require('../../../utils/response');
     return validationError(res, error.details.map((d) => ({ field: d.context.key, message: d.message })));
@@ -28,7 +28,8 @@ router.put('/:id', validate(validation.updateProduct), auditLog('PRODUCT_UPDATE'
 router.delete('/:id', auditLog('PRODUCT_DELETE', 'product'), controller.destroy);
 
 // Images
-router.post('/:id/images', uploadMiddleware, controller.uploadImage);
+router.post('/:id/images', uploadMultipleMiddleware, controller.uploadImages);
+router.put('/:id/images/:imgId/primary', controller.setPrimaryImage);
 router.delete('/:id/images/:imgId', controller.deleteImage);
 
 // Order history for a product

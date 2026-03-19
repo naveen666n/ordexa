@@ -37,6 +37,7 @@ const summarySchema = Joi.object({
 router.use(authenticate);
 
 router.get('/', controller.getCart);
+router.get('/available-coupons', controller.getAvailableCoupons);
 router.post('/items', validate(addItemSchema), controller.addItem);
 router.put('/items/:variantId', validate(updateItemSchema), controller.updateItem);
 router.delete('/items/:variantId', controller.removeItem);

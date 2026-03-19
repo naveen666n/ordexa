@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { formatCurrency, formatDateTime } from '../../../lib/formatters';
+import { getImageSrc } from '../../../lib/utils';
 
 const ORDER_STATUS_STYLES = {
   pending:    'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -262,7 +263,7 @@ const AdminOrderDetailPage = () => {
               <div key={item.id} className="flex items-center gap-4 text-sm">
                 {item.image_url && (
                   <img
-                    src={item.image_url}
+                    src={getImageSrc(item.image_url)}
                     alt={item.product_name}
                     className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border"
                   />

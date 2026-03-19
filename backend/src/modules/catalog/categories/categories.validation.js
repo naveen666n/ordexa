@@ -6,7 +6,7 @@ const create = Joi.object({
   slug: Joi.string().trim().max(200).allow('').optional(),
   parent_id: Joi.number().integer().min(1).allow(null).optional(),
   description: Joi.string().trim().max(5000).optional().allow('', null),
-  image_url: Joi.string().uri().max(500).optional().allow('', null),
+  image_url: Joi.string().max(500).optional().allow('', null),
   sort_order: Joi.number().integer().min(0).default(0),
   is_active: Joi.boolean().default(true),
 });
@@ -16,7 +16,7 @@ const update = Joi.object({
   slug: Joi.string().trim().max(200).allow('').optional(),
   parent_id: Joi.number().integer().min(1).allow(null).optional(),
   description: Joi.string().trim().max(5000).optional().allow('', null),
-  image_url: Joi.string().uri().max(500).optional().allow('', null),
+  image_url: Joi.string().max(500).optional().allow('', null),
   sort_order: Joi.number().integer().min(0).optional(),
   is_active: Joi.boolean().optional(),
 }).min(1);

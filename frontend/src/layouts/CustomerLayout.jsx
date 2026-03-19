@@ -10,6 +10,7 @@ import { Button } from '../components/ui/button';
 import SearchBar from '../components/customer/SearchBar';
 import CartDrawer from '../components/customer/CartDrawer';
 import { useConfig } from '../context/ConfigContext';
+import { getImageSrc } from '../lib/utils';
 
 const CustomerLayout = () => {
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ const CustomerLayout = () => {
           {/* Logo */}
           <Link to="/" className="font-bold text-xl text-foreground tracking-tight flex-shrink-0">
             {config?.site?.logo_url ? (
-              <img src={config.site.logo_url} alt={config.site.name || 'Store'} className="h-8 object-contain" />
+              <img src={getImageSrc(config.site.logo_url)} alt={config.site.name || 'Store'} className="h-8 object-contain" />
             ) : (
               config?.site?.name || 'Store'
             )}
@@ -62,11 +63,6 @@ const CustomerLayout = () => {
           <nav className="hidden md:flex items-center gap-5 text-sm font-medium text-muted-foreground flex-shrink-0">
             <Link to="/" className="hover:text-foreground transition-colors">Home</Link>
             <Link to="/catalog" className="hover:text-foreground transition-colors">Shop</Link>
-            {isAuthenticated && (
-              <Link to="/orders" className="hover:text-foreground transition-colors flex items-center gap-1">
-                <Package size={15} /> My Orders
-              </Link>
-            )}
           </nav>
 
           {/* Search bar — grows to fill available space */}
@@ -76,13 +72,6 @@ const CustomerLayout = () => {
 
           {/* Right actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            {/* My Orders — mobile quick link */}
-            {isAuthenticated && (
-              <Link to="/orders" className="p-2 hover:bg-accent rounded-md transition-colors md:hidden" title="My Orders">
-                <Package size={20} />
-              </Link>
-            )}
-
             {/* Cart */}
             <Link to="/cart" className="relative p-2 hover:bg-accent rounded-md transition-colors">
               <ShoppingCart size={20} />
@@ -98,6 +87,11 @@ const CustomerLayout = () => {
                 {/* Wishlist */}
                 <Link to="/wishlist" className="p-2 hover:bg-accent rounded-md transition-colors hidden sm:flex">
                   <Heart size={20} />
+                </Link>
+
+                {/* My Orders */}
+                <Link to="/orders" className="p-2 hover:bg-accent rounded-md transition-colors hidden sm:flex" title="My Orders">
+                  <Package size={20} />
                 </Link>
 
                 {/* User dropdown */}

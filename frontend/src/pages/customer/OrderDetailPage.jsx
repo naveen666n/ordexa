@@ -8,6 +8,7 @@ import usePayment from '../../hooks/usePayment';
 import { useConfig } from '../../context/ConfigContext';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
+import { getImageSrc } from '../../lib/utils';
 import { formatCurrency, formatDateTime } from '../../lib/formatters';
 
 const ORDER_STATUS_STYLES = {
@@ -392,11 +393,24 @@ const OrderDetailPage = () => {
             {order.items?.map((item) => (
               <div key={item.id} className="flex items-center gap-4 text-sm">
                 {item.image_url && (
-                  <img src={item.image_url} alt={item.product_name}
-                    className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border" />
+                  item.product_slug ? (
+                    <Link to={`/products/${item.product_slug}`} className="flex-shrink-0">
+                      <img src={getImageSrc(item.image_url)} alt={item.product_name}
+                        className="w-14 h-14 rounded-lg object-cover border hover:opacity-80 transition-opacity" />
+                    </Link>
+                  ) : (
+                    <img src={getImageSrc(item.image_url)} alt={item.product_name}
+                      className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border" />
+                  )
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-800">{item.product_name}</p>
+                  {item.product_slug ? (
+                    <Link to={`/products/${item.product_slug}`} className="font-medium text-gray-800 hover:text-primary hover:underline">
+                      {item.product_name}
+                    </Link>
+                  ) : (
+                    <p className="font-medium text-gray-800">{item.product_name}</p>
+                  )}
                   {item.variant_info?.name && (
                     <p className="text-xs text-muted-foreground">{item.variant_info.name}</p>
                   )}

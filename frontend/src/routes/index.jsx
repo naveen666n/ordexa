@@ -53,6 +53,7 @@ import TaxConfigPage from '../pages/admin/config/TaxConfigPage';
 import NotificationConfigPage from '../pages/admin/config/NotificationConfigPage';
 import FeatureFlagsPage from '../pages/admin/config/FeatureFlagsPage';
 import OrdersConfigPage from '../pages/admin/config/OrdersConfigPage';
+import StorageConfigPage from '../pages/admin/config/StorageConfigPage';
 import CmsHomePage from '../pages/admin/cms/CmsHomePage';
 import CmsContentPage from '../pages/admin/cms/CmsContentPage';
 import ReviewsModerationPage from '../pages/admin/ReviewsModerationPage';
@@ -142,6 +143,7 @@ const AppRouter = () => {
                 <Route path="config/notifications" element={<NotificationConfigPage />} />
                 <Route path="config/features" element={<FeatureFlagsPage />} />
                 <Route path="config/orders" element={<OrdersConfigPage />} />
+                <Route path="config/storage" element={<StorageConfigPage />} />
                 <Route path="cms" element={<CmsHomePage />} />
                 <Route path="cms/content" element={<CmsContentPage />} />
                 <Route path="reviews" element={<ReviewsModerationPage />} />

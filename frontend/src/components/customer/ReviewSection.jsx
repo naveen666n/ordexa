@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import reviewsApi from '../../api/reviews.api';
-import { API_BASE_URL } from '../../lib/constants';
-
-const BACKEND_URL = API_BASE_URL.replace('/api/v1', '');
+import { getImageSrc } from '../../lib/utils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,13 +73,13 @@ const Lightbox = ({ media, onClose }) => {
       <div className="max-w-3xl max-h-[90vh] p-4" onClick={(e) => e.stopPropagation()}>
         {media.media_type === 'video' ? (
           <video
-            src={`${BACKEND_URL}${media.url}`}
+            src={getImageSrc(media.url)}
             controls
             className="max-h-[80vh] max-w-full rounded-lg"
           />
         ) : (
           <img
-            src={`${BACKEND_URL}${media.url}`}
+            src={getImageSrc(media.url)}
             alt="Review media"
             className="max-h-[80vh] max-w-full rounded-lg object-contain"
           />
@@ -135,7 +133,7 @@ const ReviewCard = ({ review }) => {
                 </div>
               ) : (
                 <img
-                  src={`${BACKEND_URL}${m.url}`}
+                  src={getImageSrc(m.url)}
                   alt="Review image"
                   className="w-full h-full object-cover"
                 />

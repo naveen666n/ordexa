@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { formatCurrency } from '../../../lib/formatters';
+import { getImageSrc } from '../../../lib/utils';
 
 const ProductsListPage = () => {
   const queryClient = useQueryClient();
@@ -102,7 +103,7 @@ const ProductsListPage = () => {
                 const priceLabel = minP === null ? '—'
                   : minP === maxP ? formatCurrency(minP)
                   : `${formatCurrency(minP)} – ${formatCurrency(maxP)}`;
-                const thumb = product.images?.[0]?.url;
+                const thumb = getImageSrc(product.images?.[0]?.url);
 
                 return (
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors">

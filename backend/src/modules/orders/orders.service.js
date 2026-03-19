@@ -1,6 +1,6 @@
 'use strict';
 
-const { sequelize, Order, OrderItem, OrderStatusHistory, ProductVariant, Address, User, Payment } = require('../../models');
+const { sequelize, Order, OrderItem, OrderStatusHistory, ProductVariant, Product, Address, User, Payment } = require('../../models');
 const notificationsService = require('../notifications/notifications.service');
 const paymentService = require('../payments/payment.service');
 const cartRepo = require('../cart/cart.repository');
@@ -213,7 +213,17 @@ const getOrderByNumber = async (orderNumber, userId = null) => {
   const order = await Order.findOne({
     where,
     include: [
-      { model: OrderItem, as: 'items' },
+      {
+        model: OrderItem,
+        as: 'items',
+        include: [{
+          model: ProductVariant,
+          as: 'variant',
+          attributes: ['id'],
+          include: [{ model: Product, as: 'product', attributes: ['slug'] }],
+          required: false,
+        }],
+      },
       {
         model: OrderStatusHistory,
         as: 'statusHistory',
@@ -225,7 +235,15 @@ const getOrderByNumber = async (orderNumber, userId = null) => {
     ],
   });
   if (!order) throw new AppError('Order not found.', 404, 'NOT_FOUND');
-  return order;
+
+  // Flatten product_slug onto each item
+  const plain = order.toJSON();
+  plain.items = plain.items.map((item) => {
+    item.product_slug = item.variant?.product?.slug || null;
+    delete item.variant;
+    return item;
+  });
+  return plain;
 };
 
 // ─── listOrders (customer) ────────────────────────────────────────────────────
@@ -234,13 +252,35 @@ const listOrders = async (userId, { page = 1, limit = 10 } = {}) => {
   const offset = (page - 1) * limit;
   const { rows: orders, count: total } = await Order.findAndCountAll({
     where: { user_id: userId },
-    include: [{ model: OrderItem, as: 'items' }],
+    include: [{
+      model: OrderItem,
+      as: 'items',
+      include: [{
+        model: ProductVariant,
+        as: 'variant',
+        attributes: ['id'],
+        include: [{ model: Product, as: 'product', attributes: ['slug'] }],
+        required: false,
+      }],
+    }],
     order: [['created_at', 'DESC']],
     limit,
     offset,
   });
+
+  // Flatten product_slug onto each item
+  const ordersJson = orders.map((o) => {
+    const plain = o.toJSON();
+    plain.items = plain.items.map((item) => {
+      item.product_slug = item.variant?.product?.slug || null;
+      delete item.variant;
+      return item;
+    });
+    return plain;
+  });
+
   return {
-    orders,
+    orders: ordersJson,
     pagination: { total, page, limit, total_pages: Math.ceil(total / limit) },
   };
 };

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Loader2, AlertCircle, ChevronRight, FolderOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertCircle, ChevronRight, FolderOpen, ImageIcon } from 'lucide-react';
 import adminCategoriesApi from '../../../api/admin/categories.api';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Skeleton } from '../../../components/ui/skeleton';
+import { getImageSrc } from '../../../lib/utils';
+import ImageUploadField from '../../../components/admin/ImageUploadField';
 
 // ─── Category Form ─────────────────────────────────────────────────────────────
 
@@ -16,6 +18,7 @@ const CategoryForm = ({ initial, categories, onSave, onCancel }) => {
     parent_id: initial?.parent_id ?? '',
     sort_order: initial?.sort_order ?? 0,
     is_active: initial?.is_active ?? true,
+    image_url: initial?.image_url ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -32,6 +35,7 @@ const CategoryForm = ({ initial, categories, onSave, onCancel }) => {
         parent_id: form.parent_id ? Number(form.parent_id) : undefined,
         sort_order: Number(form.sort_order) || 0,
         is_active: form.is_active,
+        image_url: form.image_url || undefined,
       };
       await onSave(body);
     } catch (err) {
@@ -52,6 +56,12 @@ const CategoryForm = ({ initial, categories, onSave, onCancel }) => {
         <Label className="text-xs">Slug (auto-generated if blank)</Label>
         <Input value={form.slug} onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))} placeholder="electronics" className="mt-1 h-8 text-sm" />
       </div>
+      <ImageUploadField
+        label="Category Image"
+        value={form.image_url}
+        onChange={(val) => setForm((p) => ({ ...p, image_url: val }))}
+        placeholder="https://example.com/image.jpg"
+      />
       <div>
         <Label className="text-xs">Parent category</Label>
         <select
@@ -208,6 +218,18 @@ const CategoriesPage = () => {
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2" style={{ paddingLeft: depth * 20 }}>
                         {depth > 0 && <ChevronRight size={13} className="text-gray-400 flex-shrink-0" />}
+                        {cat.image_url ? (
+                          <img
+                            src={getImageSrc(cat.image_url)}
+                            alt={cat.name}
+                            className="h-7 w-7 rounded object-cover border flex-shrink-0"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="h-7 w-7 rounded bg-gray-100 border flex-shrink-0 flex items-center justify-center">
+                            <ImageIcon size={12} className="text-gray-400" />
+                          </div>
+                        )}
                         <span className="font-medium text-gray-800">{cat.name}</span>
                         <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{cat.slug}</span>
                       </div>

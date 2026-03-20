@@ -20,7 +20,7 @@
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-YOUR_DOMAIN}"
-APP_DIR="/var/www/ordex"
+APP_DIR="/var/www/product-catalog"
 BACKEND_DIR="$APP_DIR/backend"
 UPLOAD_DIR="/var/uploads"
 DB_NAME="product_catalog_prod"
